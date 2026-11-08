@@ -66,8 +66,9 @@ final class ServerSettings {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw .invalid }
         let bare = !text.contains("://")
-        guard var parts = URLComponents(string: bare ? "https://" + text : text),
-              let host = parts.percentEncodedHost?.lowercased(), !host.isEmpty,
+        guard Self.authority(of: text).unicodeScalars.allSatisfy({ $0.isASCII && $0 != "%" }),
+              var parts = URLComponents(string: bare ? "https://" + text : text),
+              let typed = parts.percentEncodedHost, let host = ServerHost.canonical(typed),
               parts.user == nil, parts.password == nil else { throw .invalid }
         let scheme = bare ? (HomeNetwork.contains(host: host) ? "http" : "https") : parts.scheme?.lowercased()
         switch scheme {
@@ -83,5 +84,11 @@ final class ServerSettings {
         if parts.path.isEmpty { parts.path = "/" }
         guard let url = parts.url, Origin.canonical(url) != nil else { throw .invalid }
         return url
+    }
+
+    /// The `host[:port]` part as typed (Foundation would already have IDNA-encoded it).
+    private static func authority(of text: String) -> Substring {
+        let rest = text.range(of: "://").map { text[$0.upperBound...] } ?? text[...]
+        return rest.prefix { !"/?#".contains($0) }
     }
 }

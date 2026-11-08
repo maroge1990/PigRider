@@ -236,6 +236,20 @@ struct WebBridgeRoundTripTests {
         #expect(connected as? Bool == true)
     }
 
+    /// From the address typed in settings to a working bridge: the saved origin
+    /// equals WebKit's `location.origin`, so the polyfill installs and calls pass.
+    @Test(arguments: ["http://[fd12:3456:0:0:0:0:0:1]:8080", "http://192.168.1.20.:8080", "https://[2001:DB8:0:0::1]"])
+    func aTypedServerAddressGetsAWorkingBridge(_ typed: String) async throws {
+        let url = try ServerSettings.normalise(typed)
+        let origin = try #require(Origin.canonical(url))
+        let page = RoundTripPage(polyfill: try BridgePolyfill.bundled(), origin: origin)
+        try await page.load(baseURL: url.absoluteString)
+        #expect(try await page.run("return location.origin") as? String == origin)
+        #expect(try await page.run("return navigator.bluetooth.pigriderBridge.version") as? Int == 1)
+        let devices = try await page.run("return (await navigator.bluetooth.getDevices()).length")
+        #expect(devices as? Int == 0)
+    }
+
     @Test func theHTTPTwinOfAnHTTPSServerGetsNoBluetooth() async throws {
         try await page.load(baseURL: "http://bridge.test")
         #expect(try await page.run("return typeof navigator.bluetooth") as? String == "undefined")
