@@ -165,6 +165,32 @@ struct BridgeLifecycleTests {
         #expect(h.call(.getDevices).succeeded)
     }
 
+    @Test func aNewDocumentsConnectWaitsUntilTheOldLinkIsGone() {
+        h.grant()
+        h.call(.connect(id: kickrID))
+        h.bridge.documentDidChange()
+        let fresh = h.call(.connect(id: kickrID))
+        // The old document's attempt connected late; it is not the new document's link.
+        h.bridge.central(didConnect: kickrID)
+        h.bridge.peripheral(kickrID, didUpdateValueFor: bikeData, value: Data([1]), error: nil)
+        #expect(fresh.isPending)
+        h.bridge.central(didDisconnect: kickrID)
+        h.bridge.central(didConnect: kickrID)
+        #expect(fresh.epoch == 2)
+        #expect(h.central.connects == [kickrID, kickrID])
+        #expect(h.sink.events.isEmpty)
+    }
+
+    @Test func aConnectQueuedByTheOldDocumentIsDroppedWithIt() {
+        h.connect()
+        h.call(.disconnect(id: kickrID, epoch: nil))
+        let queued = h.call(.connect(id: kickrID))
+        h.bridge.documentDidChange()
+        h.bridge.central(didDisconnect: kickrID)
+        #expect(queued.all == [.failure(.documentChanged)])
+        #expect(h.central.connects == [kickrID])
+    }
+
     @Test func aNewDocumentForgetsDevicesDroppedInTheBackground() {
         h.connect()
         h.bridge.enterBackground()

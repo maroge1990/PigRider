@@ -19,10 +19,19 @@ import Foundation
 ///   (not "inactive"). Connections end on background; on foreground the page
 ///   gets `disconnected` for each device that was connected and reconnects.
 /// Events go out through the `EventSink`, in the order they happen.
+/// A link we cancel drains: new connects wait until CoreBluetooth answers the
+/// cancel (or `drainTimeout` passes), so no late callback of the cancelled
+/// link can reach a newer connection, in this document or the next.
 @MainActor
 final class BluetoothBridge {
     /// A GATT operation without a callback for this long ends the connection.
     static let gattTimeout: Duration = .seconds(10)
+    /// How long a cancelled link waits for CoreBluetooth's answer before new
+    /// connects go ahead anyway (CoreBluetooth may never answer the cancel of a
+    /// pending connect). A local cancel of a link whose peer has gone quiet can
+    /// take up to the supervision timeout, which Apple's accessory guidelines
+    /// cap at 6 s; and 6 s leaves a queued connect 9 s of the page's 15 s.
+    static let drainTimeout: Duration = .seconds(6)
 
     private let central: any CentralManaging
     private let grants: GrantStore
@@ -241,14 +250,18 @@ final class BluetoothBridge {
         // The epoch is assigned before CoreBluetooth is asked, and every attempt gets its own.
         epochs[id, default: 0] += 1
         let epoch = epochs[id, default: 0]
+        let attempt = Attempt(epoch: epoch, reply: reply)
         switch link.state {
         case .idle:
-            link.state = .connecting([Attempt(epoch: epoch, reply: reply)])
+            link.state = .connecting([attempt])
             central.connect(link.handle)
         case .connecting(let attempts):
-            link.state = .connecting(attempts + [Attempt(epoch: epoch, reply: reply)])
+            link.state = .connecting(attempts + [attempt])
         case .connected:
             reply.succeed(.epoch(epoch))
+        case .draining(let drain):
+            // Until CoreBluetooth has answered our cancel, a didConnect could be the old attempt's.
+            drain.queued.append(attempt)
         }
     }
 
@@ -274,22 +287,62 @@ final class BluetoothBridge {
 
     /// Ends a link: `disconnected` (if it was connected and `emit`) goes out
     /// first, then every pending attempt and operation rejects with `error`.
+    /// With `cancel`, the link drains until CoreBluetooth answers the cancel;
+    /// without, CoreBluetooth has already let it go (or never will answer).
     private func teardown(_ id: UUID, _ link: Link, cancel: Bool, emit: Bool, error: BridgeError) {
         let previous = link.state
-        if case .idle = previous { return }
-        link.state = .idle
-        if cancel {
-            central.cancelConnection(link.handle)
-            link.cancelOutstanding = true
-        }
         switch previous {
         case .idle:
+            return
+        case .draining(let drain):
+            // Already cancelled; only the queued attempts end here.
+            if !cancel {
+                drain.timer?.cancel()
+                link.state = .idle
+            }
+            let queued = drain.queued
+            drain.queued = []
+            for attempt in queued { attempt.reply.fail(error) }
+            return
+        case .connecting, .connected:
+            break
+        }
+        if cancel {
+            central.cancelConnection(link.handle)
+            startDraining(link)
+        } else {
+            link.state = .idle
+        }
+        switch previous {
+        case .idle, .draining:
             break
         case .connecting(let attempts):
             for attempt in attempts { attempt.reply.fail(error) }
         case .connected(let session):
             if emit { events.send(.disconnected(id: id, epoch: epochs[id, default: 0])) }
             session.invalidate(error)
+        }
+    }
+
+    private func startDraining(_ link: Link) {
+        let drain = Drain()
+        link.state = .draining(drain)
+        drain.timer = scheduler.schedule(after: Self.drainTimeout) { [weak self, weak link, weak drain] in
+            guard let self, let link, let drain else { return }
+            self.finishDraining(link, drain)
+        }
+    }
+
+    /// CoreBluetooth has answered our cancel (or the drain timed out): connects
+    /// queued meanwhile now start a fresh connection.
+    private func finishDraining(_ link: Link, _ expected: Drain? = nil) {
+        guard case .draining(let drain) = link.state, expected == nil || expected === drain else { return }
+        drain.timer?.cancel()
+        if drain.queued.isEmpty {
+            link.state = .idle
+        } else {
+            link.state = .connecting(drain.queued)
+            central.connect(link.handle)
         }
     }
 
@@ -441,10 +494,8 @@ extension BluetoothBridge: CentralEvents {
         let state = central.state
         if state != .poweredOn {
             let unavailable = BridgeError(.networkError, "Bluetooth is not available.")
-            for (id, link) in links {
-                teardown(id, link, cancel: false, emit: true, error: unavailable)
-                link.cancelOutstanding = false
-            }
+            // CoreBluetooth answers no outstanding cancel once it is unavailable.
+            for (id, link) in links { teardown(id, link, cancel: false, emit: true, error: unavailable) }
         }
         if let session = openChooser, let error = Self.unavailableError(state) {
             openChooser = nil
@@ -460,8 +511,8 @@ extension BluetoothBridge: CentralEvents {
     }
 
     func central(didConnect id: UUID) {
+        // While draining, this is the cancelled attempt's link; its didDisconnect follows.
         guard let link = links[id], case .connecting(let attempts) = link.state else { return }
-        link.cancelOutstanding = false
         link.state = .connected(Session())
         // Each pending attempt gets its own epoch; later events carry the newest.
         for attempt in attempts { attempt.reply.succeed(.epoch(attempt.epoch)) }
@@ -469,19 +520,21 @@ extension BluetoothBridge: CentralEvents {
 
     func central(didFailToConnect id: UUID) {
         guard let link = links[id] else { return }
-        if link.cancelOutstanding {
-            link.cancelOutstanding = false
-            return
+        switch link.state {
+        case .draining:
+            finishDraining(link)
+        case .connecting:
+            teardown(id, link, cancel: false, emit: false, error: BridgeError(.networkError, "Connection failed."))
+        case .idle, .connected:
+            break
         }
-        guard case .connecting = link.state else { return }
-        teardown(id, link, cancel: false, emit: false, error: BridgeError(.networkError, "Connection failed."))
     }
 
     func central(didDisconnect id: UUID) {
         guard let link = links[id] else { return }
-        // The answer to our own cancel; CoreBluetooth delivers it before a newer didConnect.
-        if link.cancelOutstanding {
-            link.cancelOutstanding = false
+        if case .draining = link.state {
+            // The answer to our own cancel.
+            finishDraining(link)
             return
         }
         teardown(id, link, cancel: false, emit: true, error: .disconnected)
@@ -587,12 +640,14 @@ private final class Link {
         case idle
         case connecting([Attempt])
         case connected(Session)
+        /// We cancelled the link and CoreBluetooth's answer (didDisconnect or
+        /// didFailToConnect) is still to come. A didConnect or GATT callback
+        /// now belongs to the cancelled link and is ignored; connects queue.
+        case draining(Drain)
     }
 
     let handle: any PeripheralHandle
     var state: State = .idle
-    /// We cancelled the link and CoreBluetooth's didDisconnect for it is still to come.
-    var cancelOutstanding = false
 
     init(handle: any PeripheralHandle) {
         self.handle = handle
@@ -601,6 +656,14 @@ private final class Link {
     var session: Session? {
         if case .connected(let session) = state { session } else { nil }
     }
+}
+
+/// A cancel waiting for CoreBluetooth's answer, and the connects that wait for it.
+@MainActor
+private final class Drain {
+    var queued: [Attempt] = []
+    /// Ends the drain if CoreBluetooth never answers (`drainTimeout`).
+    var timer: (any TimerToken)?
 }
 
 private struct GattOp {
