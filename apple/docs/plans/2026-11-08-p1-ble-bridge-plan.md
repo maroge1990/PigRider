@@ -142,5 +142,5 @@ Gate 2 runs on the whole branch.
   needs the paid team signed in (Mark), before T8.
 - T8 needs the server on passyflix. Mark chose (2026-11-09) plain HTTP on the
   home network: the app accepts `http://` for home-network hosts (ADR 0001),
-  and the basic deployment (Docker Compose, no Strava yet) moves forward from
-  P2 to before T8, with Mark's OK.
+  and the basic deployment (an Unraid container from GHCR like PigTV, no Strava
+  yet; `apple/docs/server.md`, PR #3) moves forward from P2 to before T8.
