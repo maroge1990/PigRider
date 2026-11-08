@@ -28,4 +28,6 @@ result of each line (✅ / ❌ + what happened) in the PR. On any ❌, use
 - [ ] Cancel a connect that is still pending (turn the trainer off while
       "Connecting…", wait for the error, turn it on, connect again): the
       second connect must not hang. If CoreBluetooth never confirms the
-      cancel, the bridge may wait forever (Swift builder's note, P1).
+      cancel, the bridge waits 6 s and then connects anyway; a very late
+      cancel answer then fails that attempt once and the page retries.
+      Note how long the second connect took.

@@ -96,6 +96,11 @@ not guaranteed. These rules make every interleaving safe.
   reconnected, as in Chrome; a GATT call whose connection ends before its
   reply rejects with `NetworkError`.
 
+- **Cancels drain.** After Swift cancels a link, a `connect` gets its epoch at
+  once but waits until CoreBluetooth answers the cancel (`didDisconnect` or
+  `didFailToConnect`, or 6 s pass); a `didConnect` or GATT callback meanwhile
+  belongs to the cancelled link and is ignored.
+
 ## GATT operations and timeouts
 
 CoreBluetooth callbacks carry no request id, so Swift never lets two
@@ -115,7 +120,8 @@ callback ends the connection instead of being guessed at.
   in the `connected(epoch)` state the queue belongs to; anything arriving for
   a cleared queue or in another state is dropped. CoreBluetooth delivers
   delegate callbacks in order on the main queue, so a callback of the old
-  connection cannot arrive after the new connection's `didConnect`.
+  connection cannot arrive after the new connection's `didConnect` (see
+  "Cancels drain").
 - **Write without response** waits for `canSendWriteWithoutResponse` (or
   `peripheralIsReady(toSendWriteWithoutResponse:)`) and resolves once handed
   to CoreBluetooth.
