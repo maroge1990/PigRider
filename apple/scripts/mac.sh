@@ -18,7 +18,9 @@ logdir=$HOME/.cache/pigrider
 log=$logdir/xcodebuild-$cmd.log
 mkdir -p "$logdir"
 
-commit=$(git -C "$here" rev-parse --short=12 HEAD)
+# HEAD is resolved once: the label and the uploaded tree come from the same commit.
+full=$(git -C "$here" rev-parse --verify HEAD^{commit})
+commit=${full:0:12}
 # Build numbers are Unix times: they only grow, whatever the branch. The commit goes in the bundle.
 build=$(date +%s)
 
@@ -27,11 +29,12 @@ if [ "$cmd" = testflight ]; then
     echo "Uncommitted changes in apple/: TestFlight uploads HEAD only. Commit first." >&2
     exit 1
   fi
-  # A snapshot of HEAD's apple/ in its own folder on the Mac: no other run can change what is uploaded.
-  work=build/PigRider-release/$build-$commit
-  ssh "$host" "mkdir -p $work"
+  # A snapshot of that commit's apple/ in a fresh folder on the Mac (mktemp: never shared with
+  # another run), so nothing else can change what is uploaded.
+  work=$(ssh "$host" "mkdir -p build/PigRider-release && mktemp -d build/PigRider-release/$build-$commit.XXXXXX")
+  [[ "$work" =~ ^build/PigRider-release/[0-9]+-[0-9a-f]+\.[A-Za-z0-9]+$ ]] || { echo "Unexpected folder: $work" >&2; exit 1; }
   # From the repo root: run inside apple/, git archive limits itself to that folder and finds nothing.
-  git -C "$here/.." archive --format=tar --prefix=apple/ HEAD:apple | ssh "$host" "tar -x -C $work"
+  git -C "$here/.." archive --format=tar --prefix=apple/ "$full:apple" | ssh "$host" "tar -x -C $work"
   ssh "$host" "test -f $work/apple/project.yml && test -x $work/apple/scripts/signed.sh" \
     || { echo "The snapshot on the Mac is incomplete." >&2; exit 1; }
   echo "TestFlight build $build from $commit"
