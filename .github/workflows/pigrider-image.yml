@@ -2,8 +2,8 @@ name: PigRider image
 
 # Fork workflow (apple/docs/server.md). Every push to main builds the server
 # image (upstream's Dockerfile: server, client and routes), runs it the way
-# Unraid does, and pushes ghcr.io/maroge1990/pigrider:sha-<commit> and :latest.
-# Unraid follows :release, which only pigrider-release.yml moves.
+# Unraid does, and pushes ghcr.io/maroge1990/pigrider:sha-<commit>. There is no
+# :latest: Unraid follows :release, which only pigrider-release.yml moves.
 # A manual run on another branch pushes :sha-<commit> only (for trying a branch).
 # Pull requests build and smoke-test the image but push nothing.
 on:
@@ -63,15 +63,7 @@ jobs:
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ACTOR: ${{ github.actor }}
-          ON_MAIN: ${{ github.ref == 'refs/heads/main' }}
         run: |
           echo "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
           docker tag pigrider:candidate "$IMAGE:sha-$GITHUB_SHA"
           docker push "$IMAGE:sha-$GITHUB_SHA"
-          # Builds run in parallel: only the build of main's current head moves :latest,
-          # so an older commit finishing late never replaces a newer :latest.
-          git fetch --quiet origin main
-          if [ "$ON_MAIN" = true ] && [ "$(git rev-parse origin/main)" = "$GITHUB_SHA" ]; then
-            docker tag pigrider:candidate "$IMAGE:latest"
-            docker push "$IMAGE:latest"
-          fi

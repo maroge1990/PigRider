@@ -15,8 +15,8 @@ container from GHCR. Home network only, plain HTTP (ADR 0001).
 
 1. **Build.** Every push to `main` runs *PigRider image*: it builds upstream's
    `Dockerfile`, runs the result as Unraid will (user 99:100, read-only, no
-   capabilities; `apple/deploy/smoke-test.sh`) and pushes `:sha-<commit>` and
-   `:latest`. Pull requests run the same build and smoke test without pushing.
+   capabilities; `apple/deploy/smoke-test.sh`) and pushes `:sha-<commit>`
+   (no `:latest`; nothing would use it). Pull requests run the same build and smoke test without pushing.
 2. **Release.** *Actions → PigRider release → Run workflow* with the commit and
    the app's bridge version (PigRider settings → Bluetooth bridge). It checks
    the commit is on `main` and passed CI, and the deploy rule: the commit's
