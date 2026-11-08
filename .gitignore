@@ -15,3 +15,6 @@
 # Local deployment tweaks (see docs/deploy.md)
 docker-compose.override.yml
 tools/.cache/
+
+# Local agent notes (never committed)
+CLAUDE.local.md
