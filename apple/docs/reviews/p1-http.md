@@ -17,3 +17,8 @@ Checks after the fix: `make -C apple check` (132 bridge tests, 197 Swift tests),
 
 Fix `832f35f` checked against round 1: the finding is resolved, no in-scope
 regression. No findings.
+
+## Sign-off, verdict: approve
+
+Codex: finding 1 fixed (yes), no rejections or deferrals, no regression found;
+ADR 0001 states the accepted HTTP risks honestly. Gate passed.
