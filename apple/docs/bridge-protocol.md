@@ -80,7 +80,16 @@ not guaranteed. These rules make every interleaving safe.
   epoch. A `disconnected` event for the current epoch ends the connection and
   fires `gattserverdisconnected` once; for an older epoch it only updates the
   highest-seen record; for a newer epoch (its connect reply is still on the
-  way) it is recorded so that reply rejects.
+  way) it is recorded so that reply rejects, and if the device is connected
+  at an older epoch that connection ends too (there is one link per device,
+  and Swift tags a drop with the newest epoch). Upstream's `openController`
+  reconnects this way: a second `connect()` while still connected.
+- **Polyfill details** beyond the API table: `uuid`, `properties` and the
+  `device`/`service` back-references are provided; assigning an unbridged
+  member (e.g. `ongattserverdisconnected`) is reported like reading one; a
+  request option outside the bridged filters rejects with `NotSupportedError`
+  and is reported (`Bluetooth.requestDevice.acceptAllDevices`);
+  `gatt.disconnect()` sends nothing when neither connected nor connecting.
 
 ## GATT operations and timeouts
 
