@@ -42,8 +42,9 @@ after `disconnect()`; `characteristicvaluechanged` with a fresh `DataView`
 and `event.target` = characteristic; stale-epoch events dropped;
 `watchAdvertisements` with a `signal` (abort → `unwatchAdvertisements`,
 already-aborted signal → `AbortError`); writes accept ArrayBuffer, typed
-arrays and DataView; any other API member throws `NotSupportedError` and
-sends `reportUnsupported`; `pigriderBridge = {version, ops}`; no install
+arrays and DataView; reading any other string member of a bridged object
+returns `undefined` (so feature detection behaves as in a browser without it)
+and sends `reportUnsupported` once per member, which shows the native banner; `pigriderBridge = {version, ops}`; no install
 when the origin does not match. Timing (protocol "Connection state and
 timing"): `disconnected` for epoch E before the connect reply for E → connect
 rejects `NetworkError`, `connected` stays false; reply before event → resolves,
