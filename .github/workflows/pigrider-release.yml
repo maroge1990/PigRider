@@ -1,0 +1,78 @@
+name: PigRider release
+
+# Fork workflow (apple/docs/server.md). Points ghcr.io/maroge1990/pigrider:release,
+# which the Unraid container follows, at an image pigrider-image.yml already
+# built and smoke-tested. It never rebuilds, so the server gets exactly the
+# tested bytes. Rollback: release the earlier commit, then Force Update in Unraid.
+#
+# The deploy rule (ADR 0002, bridge spec): the server must never need a newer
+# Bluetooth bridge than the app on the iPad, because the page updates at once.
+# So the run asks for the app's bridge version (Settings → Bluetooth bridge).
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Commit on main to release (full or short SHA); its image must already be built"
+        required: true
+      app_bridge_version:
+        description: "Bluetooth bridge version of the app on the iPad (PigRider settings)"
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: pigrider-release
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      actions: read
+    env:
+      IMAGE: ghcr.io/maroge1990/pigrider
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # Inputs travel through env, never interpolated into the script.
+      - name: Check the commit and the deploy rule
+        id: check
+        env:
+          INPUT_COMMIT: ${{ inputs.commit }}
+          INPUT_BRIDGE: ${{ inputs.app_bridge_version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [[ "$INPUT_BRIDGE" =~ ^[0-9]{1,4}$ ]] || fail "The app's bridge version is a number, e.g. 1."
+          [[ "$INPUT_COMMIT" =~ ^[0-9a-f]{7,40}$ ]] || fail "The commit is a hex SHA."
+          full=$(git rev-parse --verify --quiet "${INPUT_COMMIT}^{commit}") || fail "Unknown commit."
+          git merge-base --is-ancestor "$full" origin/main || fail "Only a commit on main can be released."
+          # Any client needs at least bridge 1 on the iPad; commits from before the bridge have no file.
+          if git cat-file -e "$full:apple/BRIDGE_VERSION" 2>/dev/null; then
+            needed=$(git show "$full:apple/BRIDGE_VERSION" | tr -d '[:space:]')
+          else
+            needed=1
+          fi
+          [[ "$needed" =~ ^[0-9]+$ ]] || fail "apple/BRIDGE_VERSION at $full is not a number."
+          if (( needed > 10#$INPUT_BRIDGE )); then
+            fail "This server needs bridge $needed but the iPad app has $INPUT_BRIDGE: ship the app to TestFlight first."
+          fi
+          ci=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$full&status=success" --jq .total_count)
+          (( ci > 0 )) || fail "CI has not passed for $full."
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+
+      - name: Move :release to the built image
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          FULL: ${{ steps.check.outputs.full }}
+        run: |
+          echo "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          docker buildx imagetools inspect "$IMAGE:sha-$FULL" >/dev/null \
+            || { echo "::error::No image for $FULL yet: wait for (or run) the PigRider image workflow."; exit 1; }
+          docker buildx imagetools create --tag "$IMAGE:release" "$IMAGE:sha-$FULL"
+          echo "Released $FULL as $IMAGE:release. In Unraid: PigRider → Force Update." >> "$GITHUB_STEP_SUMMARY"

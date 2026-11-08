@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!-- PigRider server for Unraid (apple/docs/server.md). Copy to
+     /boot/config/plugins/dockerMan/templates-user/my-PigRider.xml on passyflix.
+     Never commit a filled-in secret key: it is entered in Unraid only. -->
+<Container version="2">
+  <Name>PigRider</Name>
+  <Repository>ghcr.io/maroge1990/pigrider:release</Repository>
+  <Registry>https://github.com/maroge1990/PigRider/pkgs/container/pigrider</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <MyMAC/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/maroge1990/PigRider/issues</Support>
+  <Project>https://github.com/maroge1990/PigRider</Project>
+  <ReadMe/>
+  <Overview>The OpenRadlr ride server for the PigRider iPad app: indoor riding with a smart trainer, heart rate strap and Zwift Click. Home network only, plain HTTP.</Overview>
+  <Category>Other: Tools:Utilities</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/maroge1990/PigRider/main/client/public/icons/icon-512.png</Icon>
+  <ExtraParams>--user 99:100 --read-only --cap-drop ALL --security-opt no-new-privileges:true</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <Requires/>
+  <Config Name="Web UI Port" Target="8080" Default="8080" Mode="tcp" Description="The port the iPad app uses. Change Public URL with it." Type="Port" Display="always" Required="true" Mask="false">8080</Config>
+  <Config Name="Public URL" Target="OPENRADLR_PUBLIC_URL" Default="http://192.168.1.235:8080" Mode="" Description="The exact address entered in the iPad app (scheme, IP and port)." Type="Variable" Display="always" Required="true" Mask="false">http://192.168.1.235:8080</Config>
+  <Config Name="Allowed origins" Target="OPENRADLR_ALLOWED_ORIGINS" Default="http://192.168.1.235:8080" Mode="" Description="Pages allowed to open the ride connection. Keep equal to Public URL." Type="Variable" Display="always" Required="true" Mask="false">http://192.168.1.235:8080</Config>
+  <Config Name="Server name" Target="OPENRADLR_SERVER_NAME" Default="PigRider" Mode="" Description="Shown on the start page." Type="Variable" Display="always" Required="false" Mask="false">PigRider</Config>
+  <Config Name="Timezone" Target="TZ" Default="Australia/Sydney" Mode="" Description="" Type="Variable" Display="always" Required="false" Mask="false">Australia/Sydney</Config>
+  <Config Name="App Data" Target="/app/data" Default="/mnt/user/appdata/pigrider/data" Mode="rw" Description="Strava logins (SQLite). Owned by 99:100. Back it up." Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/pigrider/data</Config>
+  <Config Name="Secret key" Target="OPENRADLR_SECRET_KEY" Default="" Mode="" Description="Encrypts Strava logins; needed once Strava is set up. Generate with: openssl rand -hex 32. Keep it the same across updates." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Log level" Target="RUST_LOG" Default="info" Mode="" Description="" Type="Variable" Display="advanced-hide" Required="false" Mask="false">info</Config>
+</Container>
