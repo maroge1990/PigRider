@@ -222,17 +222,70 @@ struct BridgeConnectionTests {
         #expect(new.epoch == 2)
     }
 
-    @Test func aCancelThatIsNeverAnsweredStopsDrainingAfterTheDrainTimeout() {
+    @Test func anUnansweredCancelOfALinkTheSystemHasDroppedEndsTheDrainAtTheTimeout() {
         h.grant()
         h.call(.connect(id: kickrID))
         h.call(.disconnect(id: kickrID, epoch: nil))
         let new = h.call(.connect(id: kickrID))
+        h.kickr.state = .disconnected
         h.scheduler.advance(by: BluetoothBridge.drainTimeout - .milliseconds(1))
         #expect(h.central.connects == [kickrID])
         h.scheduler.advance(by: .milliseconds(1))
+        // CoreBluetooth no longer holds the old link, so the next didConnect is the new attempt's.
         #expect(h.central.connects == [kickrID, kickrID])
+        #expect(h.central.cancels == [kickrID])
         h.bridge.central(didConnect: kickrID)
         #expect(new.epoch == 2)
+    }
+
+    @Test(arguments: [PeripheralState.connecting, .connected, .disconnecting])
+    func aTimeoutNeverEndsTheDrainWhileTheSystemStillHoldsTheOldLink(_ state: PeripheralState) {
+        h.grant()
+        let old = h.call(.connect(id: kickrID))
+        h.call(.disconnect(id: kickrID, epoch: nil))
+        let queued = h.call(.connect(id: kickrID))
+        h.kickr.state = state
+        h.scheduler.advance(by: BluetoothBridge.drainTimeout)
+        #expect(queued.errorName == .networkError)
+        #expect(h.central.cancels == [kickrID, kickrID])
+        #expect(h.central.connects == [kickrID])
+        // The old attempt's late link and its callbacks still reach nothing.
+        h.bridge.central(didConnect: kickrID)
+        h.bridge.peripheral(kickrID, didDiscoverServices: [ftms], error: nil)
+        h.bridge.peripheral(kickrID, didUpdateValueFor: bikeData, value: Data([1]), error: nil)
+        #expect(h.call(.getPrimaryService(id: kickrID, service: ftms)).errorName == .networkError)
+        #expect(old.all.count == 1)
+        #expect(queued.all.count == 1)
+        #expect(h.sink.events.isEmpty)
+        // Once CoreBluetooth lets go, the next connect is clean, with a newer epoch.
+        h.bridge.central(didDisconnect: kickrID)
+        h.kickr.state = .disconnected
+        let next = h.call(.connect(id: kickrID))
+        #expect(h.central.connects == [kickrID, kickrID])
+        h.bridge.central(didConnect: kickrID)
+        h.bridge.peripheral(kickrID, didUpdateValueFor: bikeData, value: Data([2]), error: nil)
+        h.resolve(controlPoint)
+        #expect(next.epoch == 3)
+        #expect(h.sink.events == [.value(id: kickrID, epoch: 3, key: bikeData, value: Data([2]))])
+    }
+
+    @Test func aConnectAfterAnExpiredDrainIsRejectedWhileTheSystemStillHoldsTheOldLink() {
+        h.grant()
+        h.call(.connect(id: kickrID))
+        h.call(.disconnect(id: kickrID, epoch: nil))
+        h.kickr.state = .connected
+        h.scheduler.advance(by: BluetoothBridge.drainTimeout)
+        let pendingTimers = h.scheduler.pendingCount
+        let refused = h.call(.connect(id: kickrID))
+        #expect(refused.errorName == .networkError)
+        #expect(h.central.connects == [kickrID])
+        #expect(h.scheduler.pendingCount == pendingTimers)
+        // The system lets go without telling us; the next connect sees it and goes ahead.
+        h.kickr.state = .disconnected
+        let next = h.call(.connect(id: kickrID))
+        #expect(h.central.connects == [kickrID, kickrID])
+        h.bridge.central(didConnect: kickrID)
+        #expect(next.succeeded)
     }
 
     @Test func anAnsweredDrainsTimeoutDoesNotEndTheNextDrain() {
