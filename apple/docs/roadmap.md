@@ -18,3 +18,4 @@ slots; see ADR 0001), App Store release (AGPL).
   intervals.icu don't need it. (P1 T7)
 - Links that open a new window (`target=_blank`, `window.open`) go to Safari,
   so the ride page is never replaced. Revisit if a server page needs a popup.
+- Lint `apple/web/` (ESLint as in `client/`) in `make -C apple check` and CI; today nothing lints it. (P1 Gate 2)

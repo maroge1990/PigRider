@@ -90,6 +90,11 @@ not guaranteed. These rules make every interleaving safe.
   request option outside the bridged filters rejects with `NotSupportedError`
   and is reported (`Bluetooth.requestDevice.acceptAllDevices`);
   `gatt.disconnect()` sends nothing when neither connected nor connecting.
+- Services and characteristics belong to one connection: after
+  `gattserverdisconnected`, discovery returns new objects, and an old one
+  rejects with `NetworkError` while disconnected and `InvalidStateError` once
+  reconnected, as in Chrome; a GATT call whose connection ends before its
+  reply rejects with `NetworkError`.
 
 ## GATT operations and timeouts
 
