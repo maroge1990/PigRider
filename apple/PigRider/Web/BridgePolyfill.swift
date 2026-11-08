@@ -30,7 +30,8 @@ struct BridgePolyfill: Sendable {
     }
 
     /// Runs at document start, in the main frame only, in the page's own world
-    /// (upstream's code reads `navigator.bluetooth` there).
+    /// (upstream's code reads `navigator.bluetooth` there). WebKit objects belong to the main actor.
+    @MainActor
     func userScript(origin: String) -> WKUserScript {
         WKUserScript(source: userScriptSource(origin: origin), injectionTime: .atDocumentStart,
                      forMainFrameOnly: true, in: .page)

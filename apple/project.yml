@@ -25,6 +25,8 @@ targets:
         CFBundleDisplayName: PigRider
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # Standard TLS only: exempt, so App Store Connect asks nothing per upload.
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UIRequiresFullScreen: true
         UISupportedInterfaceOrientations~ipad:
@@ -38,6 +40,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.maroge1990.pigrider
+        # Mark's paid team (a team id is not a secret). Signed builds: scripts/mac.sh ipad|testflight.
+        DEVELOPMENT_TEAM: 6CUZWP49QT
         TARGETED_DEVICE_FAMILY: "2"
         CODE_SIGN_STYLE: Automatic
   PigRiderTests:

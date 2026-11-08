@@ -21,7 +21,9 @@ Strava and intervals.icu.
 ## Building
 - The Mac is reachable as `ssh mac` (Apple Silicon, Xcode 27, iOS 27 simulators,
   paid developer account). It has no node or cargo; JS and Rust run here.
-- iOS builds and tests run on the Mac with `xcodebuild` (script added in P1).
+- iOS builds and tests run on the Mac with `xcodebuild` (`scripts/mac.sh`). Signed builds
+  (`make -C apple testflight` / `ipad`) need Mark at the terminal for the Mac password:
+  [docs/app-release.md](docs/app-release.md).
 - The server runs on `passyflix` as an Unraid container (`PigRider`, image from GHCR),
   over plain HTTP on the home network only (ADR 0001): [docs/server.md](docs/server.md).
 
