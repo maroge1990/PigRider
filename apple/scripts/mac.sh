@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Builds and tests the iPad app on the Mac over ssh.
-#   scripts/mac.sh test     generate the project, run unit tests on the simulator
-#   scripts/mac.sh build    build for the simulator only
-#   scripts/mac.sh ipad     signed development build, installed on the iPad (asks for the Mac password)
-#   scripts/mac.sh testflight  signed archive uploaded to TestFlight (committed tree only; asks for the password)
+# Builds, tests and ships the iPad app on the Mac over ssh.
+#   scripts/mac.sh test        generate the project, run unit tests on the simulator
+#   scripts/mac.sh build       build for the simulator only
+#   scripts/mac.sh ipad        signed development build of the working tree, installed on the iPad
+#   scripts/mac.sh testflight  signed archive of HEAD's apple/, uploaded to TestFlight
+# ipad and testflight ask for the Mac password (Xcode's account is in the login keychain).
 # Env: PIGRIDER_MAC (ssh host, default "mac"), PIGRIDER_SIM (simulator name),
 #      PIGRIDER_IPAD (device name or id, default "iPad").
-# The build number is the commit count of HEAD, so it grows along main.
 set -euo pipefail
 
 cmd=${1:-test}
@@ -18,9 +18,23 @@ logdir=$HOME/.cache/pigrider
 log=$logdir/xcodebuild-$cmd.log
 mkdir -p "$logdir"
 
-if [ "$cmd" = testflight ] && [ -n "$(git -C "$here" status --porcelain -- .)" ]; then
-  echo "Commit apple/ first: a TestFlight build must match a commit." >&2
-  exit 1
+commit=$(git -C "$here" rev-parse --short=12 HEAD)
+# Build numbers are Unix times: they only grow, whatever the branch. The commit goes in the bundle.
+build=$(date +%s)
+
+if [ "$cmd" = testflight ]; then
+  if [ -n "$(git -C "$here" status --porcelain -- .)" ]; then
+    echo "Uncommitted changes in apple/: TestFlight uploads HEAD only. Commit first." >&2
+    exit 1
+  fi
+  # A snapshot of HEAD's apple/ in its own folder on the Mac: no other run can change what is uploaded.
+  work=build/PigRider-release/$build-$commit
+  ssh "$host" "mkdir -p $work"
+  git -C "$here" archive --format=tar --prefix=apple/ HEAD:apple | ssh "$host" "tar -x -C $work"
+  echo "TestFlight build $build from $commit"
+  ssh -t "$host" "cd $work/apple && PIGRIDER_BUILD=$build PIGRIDER_COMMIT=$commit scripts/signed.sh testflight"
+  ssh "$host" "rm -rf $work"
+  exit 0
 fi
 
 ssh "$host" "mkdir -p $remote"
@@ -29,10 +43,10 @@ rsync -az --delete --exclude '*.xcodeproj' --exclude build/ "$here/" "$host:$rem
 case $cmd in
   test) action=test ;;
   build) action=build ;;
-  ipad|testflight)
-    build=$(git -C "$here" rev-list --count HEAD)
-    echo "build $build ($(git -C "$here" rev-parse --short HEAD))"
-    exec ssh -t "$host" "cd $remote && PIGRIDER_BUILD=$build PIGRIDER_IPAD=$(printf '%q' "${PIGRIDER_IPAD:-iPad}") scripts/signed.sh $cmd" ;;
+  ipad)
+    [ -z "$(git -C "$here" status --porcelain -- .)" ] || commit="$commit-dirty"
+    echo "Development build $build from $commit"
+    exec ssh -t "$host" "cd $remote && PIGRIDER_BUILD=$build PIGRIDER_COMMIT=$commit PIGRIDER_IPAD=$(printf '%q' "${PIGRIDER_IPAD:-iPad}") scripts/signed.sh ipad" ;;
   *) echo "usage: $0 test|build|ipad|testflight" >&2; exit 2 ;;
 esac
 

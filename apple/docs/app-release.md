@@ -7,7 +7,7 @@ No API key or other secret is stored anywhere.
 
 | | Command | Use |
 | --- | --- | --- |
-| TestFlight | `make -C apple testflight` | The normal way. Committed tree only; the build appears in TestFlight after Apple's processing (10–30 min) and the iPad updates from the TestFlight app. |
+| TestFlight | `make -C apple testflight` | The normal way. Uploads HEAD's `apple/` (refuses uncommitted changes there), built from its own snapshot on the Mac so no other run can change it. The build appears in TestFlight after Apple's processing (10–30 min); the iPad updates from the TestFlight app. |
 | Development build | `make -C apple ipad` | Quick checks with the iPad near the Mac (paired; Developer Mode on). Any tree. |
 
 Both run `scripts/mac.sh`, which copies `apple/` to the Mac and runs
@@ -15,9 +15,11 @@ Both run `scripts/mac.sh`, which copies `apple/` to the Mac and runs
 
 ## Versions
 
-- **Build number** (`CFBundleVersion`) = commit count of `HEAD`, so it grows
-  along `main`. App Store Connect refuses a number it has seen: upload once per
-  commit, and from `main` except for a branch build Mark is testing.
+- **Build number** (`CFBundleVersion`) = the Unix time of the upload, so it only
+  grows, on any branch, and a retry gets a new one. The commit it came from is
+  in the bundle (`PigRiderCommit`) and shown in the app's settings as
+  `0.1.0 (build, commit)`; a development build of a changed tree says
+  `<commit>-dirty`.
 - **Marketing version** (`MARKETING_VERSION` in `project.yml`, 0.1.0) changes
   by hand when it means something.
 - **Bridge version** (`apple/BRIDGE_VERSION`) is shown in the app's settings.

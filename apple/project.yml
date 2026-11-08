@@ -9,6 +9,8 @@ settings:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
+    # Set by scripts/signed.sh; unsigned builds say "dev".
+    PIGRIDER_COMMIT: dev
 targets:
   PigRider:
     type: application
@@ -27,6 +29,7 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         # Standard TLS only: exempt, so App Store Connect asks nothing per upload.
         ITSAppUsesNonExemptEncryption: false
+        PigRiderCommit: $(PIGRIDER_COMMIT)
         UILaunchScreen: {}
         UIRequiresFullScreen: true
         UISupportedInterfaceOrientations~ipad:

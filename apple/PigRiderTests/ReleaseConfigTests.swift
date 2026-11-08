@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+@testable import PigRider
 
 /// What App Store Connect needs from the app bundle for a TestFlight upload.
 struct ReleaseConfigTests {
@@ -19,5 +20,18 @@ struct ReleaseConfigTests {
         let build = try #require(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String)
         #expect(version.split(separator: ".").count == 3)
         #expect(Int(build) != nil)
+    }
+
+    /// Build numbers are timestamps, so the bundle names its commit (`dev` for unsigned builds).
+    @Test func theBundleNamesItsCommit() throws {
+        let commit = try #require(Bundle.main.object(forInfoDictionaryKey: "PigRiderCommit") as? String)
+        #expect(!commit.isEmpty)
+    }
+
+    @Test func settingsShowVersionBuildAndCommit() {
+        let info: [String: Any] = ["CFBundleShortVersionString": "0.1.0", "CFBundleVersion": "1794174000",
+                                   "PigRiderCommit": "225e0cd"]
+        #expect(AppVersion.label(info: info) == "0.1.0 (1794174000, 225e0cd)")
+        #expect(AppVersion.label(info: [:]) == "? (?, ?)")
     }
 }
