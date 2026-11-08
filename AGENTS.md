@@ -67,3 +67,8 @@ repeat it. Here is the operational knowledge on top of that.
   `server/crates/server/` — game core + WebSocket server; `tests/` — e2e
 - `routes/` — bundled route JSON (regenerate with `make routes`)
 - `docs/` — protocol, ADRs, feature docs; `.superpowers/` — workflow state
+
+## PigRider fork
+This checkout is the PigRider fork (`maroge1990/PigRider`): an iPad shell for this
+client plus a few extras. Fork rules, the Mac build and the review gate are in
+[`apple/AGENTS.md`](apple/AGENTS.md). Read it before changing anything.
