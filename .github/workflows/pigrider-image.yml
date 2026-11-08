@@ -14,9 +14,11 @@ on:
 
 permissions: {}
 
+# One group per commit on main, so a newer push never replaces a queued build
+# (every main commit gets its image); a pull request's newer push cancels its older run.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   image:
@@ -64,9 +66,12 @@ jobs:
           ON_MAIN: ${{ github.ref == 'refs/heads/main' }}
         run: |
           echo "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
-          tags=("$IMAGE:sha-$GITHUB_SHA")
-          if [ "$ON_MAIN" = true ]; then tags+=("$IMAGE:latest"); fi
-          for tag in "${tags[@]}"; do
-            docker tag pigrider:candidate "$tag"
-            docker push "$tag"
-          done
+          docker tag pigrider:candidate "$IMAGE:sha-$GITHUB_SHA"
+          docker push "$IMAGE:sha-$GITHUB_SHA"
+          # Builds run in parallel: only the build of main's current head moves :latest,
+          # so an older commit finishing late never replaces a newer :latest.
+          git fetch --quiet origin main
+          if [ "$ON_MAIN" = true ] && [ "$(git rev-parse origin/main)" = "$GITHUB_SHA" ]; then
+            docker tag pigrider:candidate "$IMAGE:latest"
+            docker push "$IMAGE:latest"
+          fi

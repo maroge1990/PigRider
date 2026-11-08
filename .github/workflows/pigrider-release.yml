@@ -52,8 +52,11 @@ jobs:
           full=$(git rev-parse --verify --quiet "${INPUT_COMMIT}^{commit}") || fail "Unknown commit."
           git merge-base --is-ancestor "$full" origin/main || fail "Only a commit on main can be released."
           # Any client needs at least bridge 1 on the iPad; commits from before the bridge have no file.
-          needed=$(git show "$full:apple/BRIDGE_VERSION" 2>/dev/null | tr -d '[:space:]')
-          needed=${needed:-1}
+          if git cat-file -e "$full:apple/BRIDGE_VERSION" 2>/dev/null; then
+            needed=$(git show "$full:apple/BRIDGE_VERSION" | tr -d '[:space:]')
+          else
+            needed=1
+          fi
           [[ "$needed" =~ ^[0-9]+$ ]] || fail "apple/BRIDGE_VERSION at $full is not a number."
           if (( needed > 10#$INPUT_BRIDGE )); then
             fail "This server needs bridge $needed but the iPad app has $INPUT_BRIDGE: ship the app to TestFlight first."
