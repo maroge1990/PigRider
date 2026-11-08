@@ -35,6 +35,14 @@ final class ServerSettings {
         case notHTTPS
     }
 
+    /// The scheme rule, in one place: the only scheme a server URL may use,
+    /// also assumed for a bare `host[:port]`. Everything downstream (origin,
+    /// navigation policy, bridge origin check) works on canonical origins and
+    /// accepts http as well. Allowing plain HTTP would change this rule (and
+    /// `defaultPort`) and add an ATS exception in `project.yml`.
+    static let scheme = "https"
+    static let defaultPort = 443
+
     static let key = "serverURL"
     private let store: any KeyValueStoring
 
@@ -59,17 +67,17 @@ final class ServerSettings {
     }
 
     /// Accepts `https://host[:port][/path]` or a bare `host[:port]`; drops query
-    /// and fragment, lowercases the host, leaves out port 443.
+    /// and fragment, lowercases the host, leaves out the default port.
     static func normalise(_ input: String) throws(Failure) -> URL {
         var text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw .invalid }
-        if !text.contains("://") { text = "https://" + text }
-        guard var parts = URLComponents(string: text), let scheme = parts.scheme?.lowercased() else { throw .invalid }
-        guard scheme == "https" else { throw scheme == "http" ? .notHTTPS : .invalid }
+        if !text.contains("://") { text = "\(scheme)://" + text }
+        guard var parts = URLComponents(string: text), let given = parts.scheme?.lowercased() else { throw .invalid }
+        guard given == scheme else { throw given == "http" ? .notHTTPS : .invalid }
         guard let host = parts.host, !host.isEmpty, parts.user == nil, parts.password == nil else { throw .invalid }
-        parts.scheme = "https"
+        parts.scheme = scheme
         parts.host = host.lowercased()
-        if parts.port == 443 { parts.port = nil }
+        if parts.port == defaultPort { parts.port = nil }
         parts.query = nil
         parts.fragment = nil
         if parts.path.isEmpty { parts.path = "/" }

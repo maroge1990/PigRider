@@ -22,6 +22,7 @@ struct MessageSource: Equatable, Sendable {
         origin = Origin.canonical(scheme: scheme, host: host, port: port)
     }
 
+    @MainActor
     init(_ frame: WKFrameInfo) {
         let origin = frame.securityOrigin
         self.init(isMainFrame: frame.isMainFrame, scheme: origin.protocol, host: origin.host, port: origin.port)
