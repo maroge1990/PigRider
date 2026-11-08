@@ -33,6 +33,8 @@ final class FakePeripheral: PeripheralHandle {
 
     let identifier: UUID
     var name: String?
+    /// CoreBluetooth's view of the link; tests set it where the bridge reads it.
+    var state: PeripheralState = .disconnected
     var canSendWriteWithoutResponse = true
     /// The GATT table discovery answers from, in order.
     var gatt: [(service: BluetoothUUID, characteristics: [DiscoveredCharacteristic])] = []

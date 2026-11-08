@@ -181,6 +181,26 @@ struct BridgeLifecycleTests {
         #expect(h.sink.events.isEmpty)
     }
 
+    @Test func theOldDocumentsLateLinkNeverBecomesTheNewDocumentsAfterTheDrainTimeout() {
+        h.grant()
+        h.call(.connect(id: kickrID))
+        h.bridge.documentDidChange()
+        let fresh = h.call(.connect(id: kickrID))
+        h.kickr.state = .connecting
+        h.scheduler.advance(by: BluetoothBridge.drainTimeout)
+        #expect(fresh.errorName == .networkError)
+        h.bridge.central(didConnect: kickrID)
+        h.bridge.peripheral(kickrID, didUpdateValueFor: bikeData, value: Data([1]), error: nil)
+        #expect(fresh.all.count == 1)
+        #expect(h.call(.getPrimaryService(id: kickrID, service: ftms)).errorName == .networkError)
+        #expect(h.sink.events.isEmpty)
+        h.bridge.central(didDisconnect: kickrID)
+        h.kickr.state = .disconnected
+        let retry = h.call(.connect(id: kickrID))
+        h.bridge.central(didConnect: kickrID)
+        #expect(retry.epoch == 3)
+    }
+
     @Test func aConnectQueuedByTheOldDocumentIsDroppedWithIt() {
         h.connect()
         h.call(.disconnect(id: kickrID, epoch: nil))

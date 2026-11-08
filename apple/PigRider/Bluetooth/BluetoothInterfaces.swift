@@ -24,6 +24,11 @@ extension CentralManaging {
     var canScan: Bool { state == .poweredOn }
 }
 
+/// `CBPeripheralState`.
+enum PeripheralState: Sendable {
+    case disconnected, connecting, connected, disconnecting
+}
+
 /// A discovered characteristic of a service.
 struct DiscoveredCharacteristic: Equatable, Sendable {
     let uuid: BluetoothUUID
@@ -36,6 +41,8 @@ struct DiscoveredCharacteristic: Equatable, Sendable {
 protocol PeripheralHandle: AnyObject {
     var identifier: UUID { get }
     var name: String? { get }
+    /// CoreBluetooth's own view of the link, whatever callbacks are still queued.
+    var state: PeripheralState { get }
     var canSendWriteWithoutResponse: Bool { get }
     func discoverServices()
     func discoverCharacteristics(for service: BluetoothUUID)

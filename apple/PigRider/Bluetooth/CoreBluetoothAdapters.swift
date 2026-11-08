@@ -130,6 +130,7 @@ final class CoreBluetoothPeripheral: NSObject, PeripheralHandle {
 
     var identifier: UUID { peripheral.identifier }
     var name: String? { peripheral.name }
+    var state: PeripheralState { PeripheralState(peripheral.state) }
     var canSendWriteWithoutResponse: Bool { peripheral.canSendWriteWithoutResponse }
 
     func discoverServices() {
@@ -264,5 +265,18 @@ extension BridgeError {
             }
         }
         return BridgeError(.networkError, "GATT operation failed: \(nsError.localizedDescription)")
+    }
+}
+
+extension PeripheralState {
+    init(_ state: CBPeripheralState) {
+        switch state {
+        case .disconnected: self = .disconnected
+        case .connecting: self = .connecting
+        case .connected: self = .connected
+        case .disconnecting: self = .disconnecting
+        // Unknown: assume CoreBluetooth still holds the link, so a drain keeps its fence.
+        @unknown default: self = .connected
+        }
     }
 }

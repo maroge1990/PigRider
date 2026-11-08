@@ -20,17 +20,18 @@ import Foundation
 ///   gets `disconnected` for each device that was connected and reconnects.
 /// Events go out through the `EventSink`, in the order they happen.
 /// A link we cancel drains: new connects wait until CoreBluetooth answers the
-/// cancel (or `drainTimeout` passes), so no late callback of the cancelled
-/// link can reach a newer connection, in this document or the next.
+/// cancel or reports the peripheral `.disconnected`, so no late callback of
+/// the cancelled link can reach a newer connection, in this document or the next.
 @MainActor
 final class BluetoothBridge {
     /// A GATT operation without a callback for this long ends the connection.
     static let gattTimeout: Duration = .seconds(10)
-    /// How long a cancelled link waits for CoreBluetooth's answer before new
-    /// connects go ahead anyway (CoreBluetooth may never answer the cancel of a
-    /// pending connect). A local cancel of a link whose peer has gone quiet can
-    /// take up to the supervision timeout, which Apple's accessory guidelines
-    /// cap at 6 s; and 6 s leaves a queued connect 9 s of the page's 15 s.
+    /// How long a cancelled link waits for CoreBluetooth's answer before the
+    /// bridge looks at the peripheral's state instead (CoreBluetooth may never
+    /// answer the cancel of a pending connect). A local cancel of a link whose
+    /// peer has gone quiet can take up to the supervision timeout, which Apple's
+    /// accessory guidelines cap at 6 s; and 6 s leaves a queued connect 9 s of
+    /// the page's 15 s.
     static let drainTimeout: Duration = .seconds(6)
 
     private let central: any CentralManaging
@@ -247,6 +248,14 @@ final class BluetoothBridge {
             reply.fail(BridgeError(.networkError, "Device is not available."))
             return
         }
+        if case .draining(let drain) = link.state, drain.expired {
+            // Past the drain timeout only CoreBluetooth's own state can end the fence.
+            guard link.handle.state == .disconnected else {
+                reply.fail(.previousLinkOpen)
+                return
+            }
+            finishDraining(link)
+        }
         // The epoch is assigned before CoreBluetooth is asked, and every attempt gets its own.
         epochs[id, default: 0] += 1
         let epoch = epochs[id, default: 0]
@@ -329,14 +338,31 @@ final class BluetoothBridge {
         link.state = .draining(drain)
         drain.timer = scheduler.schedule(after: Self.drainTimeout) { [weak self, weak link, weak drain] in
             guard let self, let link, let drain else { return }
-            self.finishDraining(link, drain)
+            self.drainTimedOut(link, drain)
         }
     }
 
-    /// CoreBluetooth has answered our cancel (or the drain timed out): connects
-    /// queued meanwhile now start a fresh connection.
-    private func finishDraining(_ link: Link, _ expected: Drain? = nil) {
-        guard case .draining(let drain) = link.state, expected == nil || expected === drain else { return }
+    /// No answer to our cancel. The timer alone never ends the fence: only
+    /// CoreBluetooth's own state saying the link is gone does.
+    private func drainTimedOut(_ link: Link, _ drain: Drain) {
+        guard case .draining(let current) = link.state, current === drain else { return }
+        drain.timer = nil
+        if link.handle.state == .disconnected {
+            finishDraining(link)
+            return
+        }
+        // CoreBluetooth still holds the old link: ask again, and let the page retry later.
+        central.cancelConnection(link.handle)
+        drain.expired = true
+        let queued = drain.queued
+        drain.queued = []
+        for attempt in queued { attempt.reply.fail(.previousLinkOpen) }
+    }
+
+    /// CoreBluetooth has answered our cancel or no longer holds the link:
+    /// connects queued meanwhile now start a fresh connection.
+    private func finishDraining(_ link: Link) {
+        guard case .draining(let drain) = link.state else { return }
         drain.timer?.cancel()
         if drain.queued.isEmpty {
             link.state = .idle
@@ -580,6 +606,7 @@ extension BluetoothBridge: CentralEvents {
 extension BridgeError {
     static let serviceNotFound = BridgeError(.notFoundError, "Service not found.")
     static let characteristicNotFound = BridgeError(.notFoundError, "Characteristic not found.")
+    static let previousLinkOpen = BridgeError(.networkError, "The previous connection has not closed yet.")
 }
 
 /// A reply that is sent exactly once; later sends are dropped.
@@ -662,8 +689,11 @@ private final class Link {
 @MainActor
 private final class Drain {
     var queued: [Attempt] = []
-    /// Ends the drain if CoreBluetooth never answers (`drainTimeout`).
+    /// Checks CoreBluetooth's state if it never answers (`drainTimeout`).
     var timer: (any TimerToken)?
+    /// The timeout passed while CoreBluetooth still held the link: connects
+    /// now go ahead only once its state is `.disconnected`, else reject.
+    var expired = false
 }
 
 private struct GattOp {

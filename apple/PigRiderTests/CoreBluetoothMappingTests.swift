@@ -16,6 +16,13 @@ struct CoreBluetoothMappingTests {
         #expect(properties.names == ["writeWithoutResponse", "write", "indicate"])
     }
 
+    @Test func peripheralStatesMapOneToOne() {
+        #expect(PeripheralState(CBPeripheralState.disconnected) == .disconnected)
+        #expect(PeripheralState(CBPeripheralState.connecting) == .connecting)
+        #expect(PeripheralState(CBPeripheralState.connected) == .connected)
+        #expect(PeripheralState(CBPeripheralState.disconnecting) == .disconnecting)
+    }
+
     @Test func attErrorsMapAsInChrome() {
         func mapped(_ code: CBATTError.Code) -> BridgeError.Name? {
             BridgeError.gatt(NSError(domain: CBATTErrorDomain, code: code.rawValue))?.name
