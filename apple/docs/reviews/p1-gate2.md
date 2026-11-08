@@ -9,3 +9,15 @@
 
 Note: Codex's sandbox could not run `make check` (no network for crates.io) or the
 Swift tests. Both are run on the orchestrator's side for each round.
+
+## Round 2 (fixes only), 2026-11-08: approve
+
+Both fixes resolve their findings; no new high-severity issue.
+
+## Deferred (for sign-off)
+
+| Item | Why deferred | Where tracked |
+| --- | --- | --- |
+| A cancel answered only after the 6 s drain fallback fails the next attempt once (page retries; sessions never mix) | Depends on real CoreBluetooth timing; only hardware shows it | `apple/docs/hardware-checklist.md`, last item |
+| `apple/web/` is not linted | Tooling gap that existed before this change, no behaviour impact | `apple/docs/roadmap.md` backlog |
+| Ride file downloads in the web view | Not needed for P1; uploads are server-side | `apple/docs/roadmap.md` backlog |
