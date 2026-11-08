@@ -9,10 +9,15 @@ final class FakeCentral: CentralManaging {
     var connects: [UUID] = []
     var cancels: [UUID] = []
     var known: [UUID: FakePeripheral] = [:]
+    /// Runs after each `connect`, e.g. to answer it like a real central would.
+    var onConnect: (@MainActor (UUID) -> Void)?
 
     func startScan() { isScanning = true }
     func stopScan() { isScanning = false }
-    func connect(_ peripheral: any PeripheralHandle) { connects.append(peripheral.identifier) }
+    func connect(_ peripheral: any PeripheralHandle) {
+        connects.append(peripheral.identifier)
+        onConnect?(peripheral.identifier)
+    }
     func cancelConnection(_ peripheral: any PeripheralHandle) { cancels.append(peripheral.identifier) }
     func retrievePeripheral(withIdentifier id: UUID) -> (any PeripheralHandle)? { known[id] }
 }
@@ -32,6 +37,8 @@ final class FakePeripheral: PeripheralHandle {
     /// The GATT table discovery answers from, in order.
     var gatt: [(service: BluetoothUUID, characteristics: [DiscoveredCharacteristic])] = []
     var calls: [Call] = []
+    /// Runs after each recorded call, e.g. to answer it like a real peripheral would.
+    var onCall: (@MainActor (Call) -> Void)?
 
     init(id: UUID, name: String?) {
         identifier = id
@@ -48,11 +55,16 @@ final class FakePeripheral: PeripheralHandle {
         }
     }
 
-    func discoverServices() { calls.append(.discoverServices) }
-    func discoverCharacteristics(for service: BluetoothUUID) { calls.append(.discoverCharacteristics(service)) }
-    func setNotifyValue(_ enabled: Bool, for key: CharacteristicKey) { calls.append(.setNotify(key)) }
+    func discoverServices() { record(.discoverServices) }
+    func discoverCharacteristics(for service: BluetoothUUID) { record(.discoverCharacteristics(service)) }
+    func setNotifyValue(_ enabled: Bool, for key: CharacteristicKey) { record(.setNotify(key)) }
     func writeValue(_ value: Data, for key: CharacteristicKey, withResponse: Bool) {
-        calls.append(.write(value, key, withResponse: withResponse))
+        record(.write(value, key, withResponse: withResponse))
+    }
+
+    private func record(_ call: Call) {
+        calls.append(call)
+        onCall?(call)
     }
 }
 
