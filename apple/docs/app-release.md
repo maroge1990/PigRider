@@ -28,13 +28,15 @@ Both run `scripts/mac.sh`, which copies `apple/` to the Mac and runs
 
 ## TestFlight setup (once)
 
-- App Store Connect: app *PigRider*, bundle id `com.maroge1990.pigrider`
-  (registered by Xcode's automatic signing), internal testing only
+- App Store Connect: app *PigRider* (Apple id 6832365279), bundle id
+  `com.maroge1990.pigrider` (an explicit App ID, registered by hand in the
+  developer portal: development builds use the team wildcard), internal testing only
   (`ExportOptions.plist`: `testFlightInternalTestingOnly`). AGPL: no App
   Store release, no external testers (ADR 0001).
 - Export compliance is answered in the bundle (`ITSAppUsesNonExemptEncryption`
   = false: standard TLS only).
-- Mark is an internal tester; install the TestFlight app on the iPad.
+- Internal group *Mark* (only Mark) with automatic distribution: every upload
+  reaches the iPad's TestFlight app once processed.
 - Xcode on the Mac must have Mark's Apple ID under Settings → Accounts.
 
 The app icon is upstream's (lemon), a placeholder until Mark picks one.
