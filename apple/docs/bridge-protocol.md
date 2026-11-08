@@ -114,3 +114,18 @@ callback ends the connection instead of being guessed at.
 - **Write without response** waits for `canSendWriteWithoutResponse` (or
   `peripheralIsReady(toSendWriteWithoutResponse:)`) and resolves once handed
   to CoreBluetooth.
+
+## Swift details beyond the tables
+
+- An `id` not granted to the calling origin is `NotFoundError`; `forget` of
+  such an id resolves `null` and changes nothing.
+- A second `requestDevice` while the chooser is open is `InvalidStateError`.
+- Calls pending at a document or server change reject with `AbortError`
+  ("The page was reloaded."), so WebKit's reply handler always runs once.
+- The 16-service limit counts distinct services across filters and
+  `optionalServices`; `optionalServices` may be omitted; a device without a
+  name is sent as `name: null`.
+- `connect` has no native timeout (the page's `connectGatt` has 15 s); only
+  GATT operations time out natively.
+- The `disconnected` events sent on return to the foreground carry the epoch
+  the page knew as connected, so `gattserverdisconnected` fires.
