@@ -51,3 +51,12 @@ Deferral replaced: the old first row is withdrawn. New deferred item:
 | Item | Why deferred | Where tracked |
 | --- | --- | --- |
 | State reads `.disconnected` at the timeout but the old `didDisconnect` is still queued: that callback fails the new attempt once with `NetworkError` (the page retries; no session exists to mix) | Whether CoreBluetooth ever reports this state ahead of its callback is only observable on hardware | `apple/docs/hardware-checklist.md`, last item |
+
+## Sign-off 2, 2026-11-08: approve
+
+Finding 1 resolved (BluetoothBridge.swift 251–257, 347–359; tests in
+BridgeConnectionTests 225–300 and BridgeLifecycleTests 184–202). The
+queued-didDisconnect deferral is accepted: callbacks run on the main queue, so
+the old terminal callback rejects the pending attempt before its didConnect,
+leaving no session to mix. Gate 2 passed; hardware timing stays on the
+checklist.
