@@ -113,6 +113,19 @@ test("after a reconnect, data flows once per packet (no doubled listeners)", asy
   assert.equal(page.readings.length, 1);
 });
 
+test("a trainer closed and opened again: only the open trainer hears its data", async () => {
+  const page = await connectedTrainer();
+  page.trainer.disconnect();
+  await settle();
+  const [device] = await page.bluetooth.getDevices();
+  const open = await SmartTrainer.open(device, options(page.timers));
+  const readings = { closed: 0, open: 0 };
+  page.trainer.on("data", () => (readings.closed += 1));
+  open.on("data", () => (readings.open += 1));
+  page.native.notify(kickr().id, UUID.CYCLING_POWER, UUID.POWER_MEASUREMENT, [0x00, 0x00, 0xfa, 0x00]);
+  assert.deepEqual(readings, { closed: 0, open: 1 });
+});
+
 // ------------------------------------------------------------- heart rate
 
 test("a heart rate strap's measurements reach HeartRateMonitor", async () => {
@@ -131,6 +144,19 @@ test("a strap that drops reconnects through the bridge", async () => {
   page.native.drop(strap().id);
   await page.timers.runNext();
   assert.deepEqual(events, ["disconnected", "reconnected"]);
+});
+
+test("a strap closed and opened again: only the open monitor hears its measurements", async () => {
+  const page = bridge(strap());
+  const closed = await HeartRateMonitor.connect(page.bluetooth, options(page.timers));
+  closed.disconnect();
+  await settle();
+  const open = await HeartRateMonitor.connect(page.bluetooth, options(page.timers));
+  const beats = { closed: [], open: [] };
+  closed.on("data", ({ heartRate }) => beats.closed.push(heartRate));
+  open.on("data", ({ heartRate }) => beats.open.push(heartRate));
+  page.native.notify(strap().id, UUID.HEART_RATE, UUID.HR_MEASUREMENT, [0x00, 142]);
+  assert.deepEqual(beats, { closed: [], open: [142] });
 });
 
 // ------------------------------------------------------------ Zwift Click

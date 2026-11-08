@@ -176,9 +176,8 @@ function installPigriderBluetooth(target, { origin, version, channel } = {}) {
         /** The `calls` count of the latest disconnect(). */
         lastDisconnect: 0,
         pendingConnects: 0,
-        services: new Map(),
-        /** "service characteristic" → {object, value}. */
-        characteristics: new Map(),
+        /** The current connection's discovered attributes (null while disconnected); see newConnection(). */
+        connection: null,
       };
       states.set(id, state);
       state.device = new BluetoothDevice(state);
@@ -187,13 +186,42 @@ function installPigriderBluetooth(target, { origin, version, channel } = {}) {
     return state.device;
   }
 
+  /**
+   * Services and characteristics belong to one connection, as in Web
+   * Bluetooth: a reconnect discovers new objects, so listeners on the old ones
+   * hear nothing more, and the old ones cannot operate on the new connection.
+   */
+  function newConnection() {
+    return {
+      services: new Map(),
+      /** "service characteristic" → {object, value, properties}. */
+      characteristics: new Map(),
+    };
+  }
+
+  const disconnectedError = () => fail("NetworkError", "GATT Server is disconnected. Cannot perform GATT operations.");
+
   function requireConnected(state) {
-    if (!state.connected) throw fail("NetworkError", "GATT Server is disconnected. Cannot perform GATT operations.");
+    if (!state.connected) throw disconnectedError();
+  }
+
+  /** As Chrome: the server is checked first (NetworkError), then whether the attribute's connection is still the current one. */
+  function requireCurrent(state, connection, kind) {
+    requireConnected(state);
+    if (connection !== state.connection) throw fail("InvalidStateError", `GATT ${kind} no longer exists.`);
+  }
+
+  /** A GATT call on `connection`; if that connection ended before the reply, it rejects with NetworkError, as in Chrome. */
+  async function gattCall(state, connection, op, args) {
+    const result = await call(op, args);
+    if (connection !== state.connection) throw disconnectedError();
+    return result;
   }
 
   function endConnection(state) {
     state.connected = false;
     state.epoch = null;
+    state.connection = null;
     state.device.dispatchEvent(new Event("gattserverdisconnected", { bubbles: true }));
   }
 
@@ -217,6 +245,8 @@ function installPigriderBluetooth(target, { origin, version, channel } = {}) {
     }
     if (failure) throw failure;
     if (value.epoch <= state.highestDisconnected) throw fail("NetworkError", "Disconnected while connecting.");
+    // A connect while connected moves to the newer epoch on the same link: the connection and its objects stay.
+    if (!state.connected) state.connection = newConnection();
     state.connected = true;
     state.epoch = value.epoch;
     return state.server;
@@ -230,22 +260,22 @@ function installPigriderBluetooth(target, { origin, version, channel } = {}) {
     if (state.connected) endConnection(state);
   }
 
-  function serviceFor(state, uuid) {
-    let service = state.services.get(uuid);
+  function serviceFor(state, connection, uuid) {
+    let service = connection.services.get(uuid);
     if (!service) {
-      service = new BluetoothRemoteGATTService(state, uuid);
-      state.services.set(uuid, service);
+      service = new BluetoothRemoteGATTService(state, connection, uuid);
+      connection.services.set(uuid, service);
     }
     return service;
   }
 
-  function characteristicFor(state, service, uuid, properties) {
+  function characteristicFor(state, connection, service, uuid, properties) {
     const key = `${service.uuid} ${uuid}`;
-    let record = state.characteristics.get(key);
+    let record = connection.characteristics.get(key);
     if (!record) {
       record = { value: null, properties: null };
-      record.object = new BluetoothRemoteGATTCharacteristic(state, service, uuid, record);
-      state.characteristics.set(key, record);
+      record.object = new BluetoothRemoteGATTCharacteristic(state, connection, service, uuid, record);
+      connection.characteristics.set(key, record);
     }
     const flags = new Set(properties || []);
     record.properties = Object.freeze(Object.fromEntries(PROPERTY_NAMES.map((name) => [name, flags.has(name)])));
@@ -372,18 +402,21 @@ function installPigriderBluetooth(target, { origin, version, channel } = {}) {
     async getPrimaryService(service) {
       const uuid = canonicalUUID(service);
       requireConnected(this.#state);
-      await call("getPrimaryService", { id: this.#state.id, service: uuid });
-      return serviceFor(this.#state, uuid);
+      const { connection } = this.#state;
+      await gattCall(this.#state, connection, "getPrimaryService", { id: this.#state.id, service: uuid });
+      return serviceFor(this.#state, connection, uuid);
     }
   }
 
   class BluetoothRemoteGATTService extends EventTarget {
     #state;
+    #connection;
     #uuid;
 
-    constructor(state, uuid) {
+    constructor(state, connection, uuid) {
       super();
       this.#state = state;
+      this.#connection = connection;
       this.#uuid = uuid;
     }
 
@@ -397,21 +430,24 @@ function installPigriderBluetooth(target, { origin, version, channel } = {}) {
 
     async getCharacteristic(characteristic) {
       const uuid = canonicalUUID(characteristic);
-      requireConnected(this.#state);
-      const { properties } = await call("getCharacteristic", { id: this.#state.id, service: this.#uuid, characteristic: uuid });
-      return characteristicFor(this.#state, this, uuid, properties);
+      requireCurrent(this.#state, this.#connection, "Service");
+      const args = { id: this.#state.id, service: this.#uuid, characteristic: uuid };
+      const { properties } = await gattCall(this.#state, this.#connection, "getCharacteristic", args);
+      return characteristicFor(this.#state, this.#connection, this, uuid, properties);
     }
   }
 
   class BluetoothRemoteGATTCharacteristic extends EventTarget {
     #state;
+    #connection;
     #service;
     #uuid;
     #record;
 
-    constructor(state, service, uuid, record) {
+    constructor(state, connection, service, uuid, record) {
       super();
       this.#state = state;
+      this.#connection = connection;
       this.#service = service;
       this.#uuid = uuid;
       this.#record = record;
@@ -434,8 +470,8 @@ function installPigriderBluetooth(target, { origin, version, channel } = {}) {
     }
 
     async startNotifications() {
-      requireConnected(this.#state);
-      await call("startNotifications", this.#address());
+      requireCurrent(this.#state, this.#connection, "Characteristic");
+      await gattCall(this.#state, this.#connection, "startNotifications", this.#address());
       return this;
     }
 
@@ -449,8 +485,8 @@ function installPigriderBluetooth(target, { origin, version, channel } = {}) {
 
     async #write(value, withResponse) {
       const bytes = toBase64(bytesOf(value));
-      requireConnected(this.#state);
-      await call("writeValue", { ...this.#address(), value: bytes, withResponse });
+      requireCurrent(this.#state, this.#connection, "Characteristic");
+      await gattCall(this.#state, this.#connection, "writeValue", { ...this.#address(), value: bytes, withResponse });
     }
 
     #address() {
@@ -471,7 +507,7 @@ function installPigriderBluetooth(target, { origin, version, channel } = {}) {
   function onValue(event) {
     const state = states.get(event.id);
     if (!state || !state.connected || event.epoch !== state.epoch) return;
-    const record = state.characteristics.get(`${event.service} ${event.characteristic}`);
+    const record = state.connection.characteristics.get(`${event.service} ${event.characteristic}`);
     if (!record) return;
     record.value = new DataView(fromBase64(event.value).buffer);
     record.object.dispatchEvent(new Event("characteristicvaluechanged", { bubbles: true }));

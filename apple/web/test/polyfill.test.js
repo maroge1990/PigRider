@@ -174,13 +174,103 @@ test("GATT lookups while disconnected reject with NetworkError and call nothing"
   assert.deepEqual(channel.messages("getPrimaryService"), []);
 });
 
-test("a characteristic is the same object on every lookup, also after a reconnect, so listeners are not doubled", async () => {
+test("a characteristic is the same object on every lookup within a connection, so listeners are not doubled", async () => {
   const page = await connected(await withDevice(), 4);
   const first = await (await page.device.gatt.getPrimaryService(FTMS)).getCharacteristic(BIKE_DATA);
-  page.dispatch(disconnected(4));
-  await connected(page, 5);
   const second = await (await page.device.gatt.getPrimaryService(0x1826)).getCharacteristic(0x2ad2);
   assert.equal(second, first);
+});
+
+test("a connect while connected keeps the connection's objects", async () => {
+  const page = await connected(await withDevice(), 4);
+  const first = await (await page.device.gatt.getPrimaryService(FTMS)).getCharacteristic(BIKE_DATA);
+  await connected(page, 5);
+  const second = await (await page.device.gatt.getPrimaryService(FTMS)).getCharacteristic(BIKE_DATA);
+  assert.equal(second, first);
+});
+
+// ------------------------------------- objects belong to one connection
+
+/** Discovers FTMS and Indoor Bike Data at epoch 4, then drops and reconnects at epoch 5. */
+async function reconnectedWithStaleObjects() {
+  const page = await connected(await withDevice(), 4);
+  page.staleService = await page.device.gatt.getPrimaryService(FTMS);
+  page.staleCharacteristic = await page.staleService.getCharacteristic(BIKE_DATA);
+  page.dispatch(disconnected(4));
+  await connected(page, 5);
+  return page;
+}
+
+test("after a reconnect, getPrimaryService returns a new service object", async () => {
+  const page = await reconnectedWithStaleObjects();
+  assert.notEqual(await page.device.gatt.getPrimaryService(FTMS), page.staleService);
+});
+
+test("after a reconnect, getCharacteristic returns a new characteristic object", async () => {
+  const page = await reconnectedWithStaleObjects();
+  const fresh = await (await page.device.gatt.getPrimaryService(FTMS)).getCharacteristic(BIKE_DATA);
+  assert.notEqual(fresh, page.staleCharacteristic);
+});
+
+test("a characteristic of an ended connection gets no value events of the next one", async () => {
+  const page = await reconnectedWithStaleObjects();
+  const fresh = await (await page.device.gatt.getPrimaryService(FTMS)).getCharacteristic(BIKE_DATA);
+  const heard = [];
+  page.staleCharacteristic.addEventListener("characteristicvaluechanged", () => heard.push("stale"));
+  fresh.addEventListener("characteristicvaluechanged", () => heard.push("fresh"));
+  page.dispatch(value(5, [1]));
+  assert.deepEqual(heard, ["fresh"]);
+});
+
+test("a characteristic of an ended connection keeps its last value", async () => {
+  const page = await connected(await withDevice(), 4);
+  const characteristic = await (await page.device.gatt.getPrimaryService(FTMS)).getCharacteristic(BIKE_DATA);
+  page.dispatch(value(4, [7]));
+  page.dispatch(disconnected(4));
+  await connected(page, 5);
+  page.dispatch(value(5, [8]));
+  assert.deepEqual([...new Uint8Array(characteristic.value.buffer)], [7]);
+});
+
+// Chrome checks the server first (NetworkError while disconnected), then the
+// attribute (InvalidStateError "GATT … no longer exists" once its connection ended).
+
+test("a service of an ended connection, used on the next one: InvalidStateError, nothing sent", async () => {
+  const page = await reconnectedWithStaleObjects();
+  page.channel.calls.length = 0;
+  await assert.rejects(page.staleService.getCharacteristic(BIKE_DATA), { name: "InvalidStateError" });
+  assert.deepEqual(page.channel.messages(), []);
+});
+
+test("a characteristic of an ended connection, startNotifications on the next one: InvalidStateError, nothing sent", async () => {
+  const page = await reconnectedWithStaleObjects();
+  page.channel.calls.length = 0;
+  await assert.rejects(page.staleCharacteristic.startNotifications(), { name: "InvalidStateError" });
+  assert.deepEqual(page.channel.messages(), []);
+});
+
+test("a characteristic of an ended connection, written on the next one: InvalidStateError, nothing sent", async () => {
+  const page = await reconnectedWithStaleObjects();
+  page.channel.calls.length = 0;
+  await assert.rejects(page.staleCharacteristic.writeValueWithoutResponse(Uint8Array.of(1)), { name: "InvalidStateError" });
+  assert.deepEqual(page.channel.messages(), []);
+});
+
+test("a characteristic of an ended connection, used while disconnected: NetworkError, as for any GATT operation", async () => {
+  const page = await connected(await withDevice(), 4);
+  const characteristic = await (await page.device.gatt.getPrimaryService(FTMS)).getCharacteristic(BIKE_DATA);
+  page.dispatch(disconnected(4));
+  await assert.rejects(characteristic.startNotifications(), { name: "NetworkError" });
+});
+
+test("a lookup whose connection ends before the reply rejects with NetworkError, also once reconnected", async () => {
+  const page = await connected(await withDevice(), 4);
+  page.channel.answer("getPrimaryService", () => {});
+  const lookup = page.device.gatt.getPrimaryService(FTMS);
+  page.dispatch(disconnected(4));
+  await connected(page, 5);
+  page.channel.pending("getPrimaryService")[0].ok();
+  await assert.rejects(lookup, { name: "NetworkError" });
 });
 
 test("a characteristic's properties come from the native reply", async () => {
