@@ -10,8 +10,9 @@ in `apple/web/test/fixtures/protocol.json`, so they cannot drift apart.
 `WKScriptMessageHandlerWithReply`. The reply is `{ok: true, value}` or
 `{ok: false, error: {name, message}}`; `name` is a `DOMException` name
 (`NotFoundError`, `NetworkError`, `SecurityError`, `NotSupportedError`,
-`InvalidStateError`, `TimeoutError`). UUIDs are lowercase 128-bit strings;
-bytes are base64.
+`InvalidStateError`, `TimeoutError`, `AbortError`). A malformed call gets
+`NotSupportedError` for an unknown `op` and `DataError` for missing, mistyped
+or oversized arguments. UUIDs are lowercase 128-bit strings; bytes are base64.
 
 | op | args | value |
 | --- | --- | --- |

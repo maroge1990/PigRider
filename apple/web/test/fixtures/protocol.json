@@ -1,0 +1,506 @@
+{
+ "version": 1,
+ "ops": [
+  "requestDevice",
+  "getDevices",
+  "forget",
+  "watchAdvertisements",
+  "unwatchAdvertisements",
+  "connect",
+  "disconnect",
+  "getPrimaryService",
+  "getCharacteristic",
+  "startNotifications",
+  "writeValue",
+  "reportUnsupported"
+ ],
+ "errorNames": [
+  "NotFoundError",
+  "NetworkError",
+  "SecurityError",
+  "NotSupportedError",
+  "InvalidStateError",
+  "TimeoutError",
+  "AbortError",
+  "DataError"
+ ],
+ "calls": [
+  {
+   "name": "request a trainer by service",
+   "message": {
+    "op": "requestDevice",
+    "filters": [
+     {
+      "services": [
+       "00001826-0000-1000-8000-00805f9b34fb"
+      ]
+     },
+     {
+      "services": [
+       "00001818-0000-1000-8000-00805f9b34fb"
+      ]
+     }
+    ],
+    "optionalServices": [
+     "00001826-0000-1000-8000-00805f9b34fb",
+     "00001818-0000-1000-8000-00805f9b34fb"
+    ]
+   },
+   "valid": true
+  },
+  {
+   "name": "request a Zwift controller by manufacturer or name prefix",
+   "message": {
+    "op": "requestDevice",
+    "filters": [
+     {
+      "manufacturerData": [
+       {
+        "companyIdentifier": 2378
+       }
+      ]
+     },
+     {
+      "namePrefix": "Zwift"
+     }
+    ],
+    "optionalServices": [
+     "00000001-19ca-4651-86e5-fa29dcdd09d1"
+    ]
+   },
+   "valid": true
+  },
+  {
+   "name": "request a remembered device by name",
+   "message": {
+    "op": "requestDevice",
+    "filters": [
+     {
+      "name": "KICKR CORE 1234"
+     }
+    ],
+    "optionalServices": [
+     "00001826-0000-1000-8000-00805f9b34fb"
+    ]
+   },
+   "valid": true
+  },
+  {
+   "name": "list granted devices",
+   "message": {
+    "op": "getDevices"
+   },
+   "valid": true
+  },
+  {
+   "name": "forget a device",
+   "message": {
+    "op": "forget",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10"
+   },
+   "valid": true
+  },
+  {
+   "name": "watch advertisements",
+   "message": {
+    "op": "watchAdvertisements",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "watchId": "w1"
+   },
+   "valid": true
+  },
+  {
+   "name": "stop watching",
+   "message": {
+    "op": "unwatchAdvertisements",
+    "watchId": "w1"
+   },
+   "valid": true
+  },
+  {
+   "name": "connect",
+   "message": {
+    "op": "connect",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10"
+   },
+   "valid": true
+  },
+  {
+   "name": "disconnect (page)",
+   "message": {
+    "op": "disconnect",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10"
+   },
+   "valid": true
+  },
+  {
+   "name": "disconnect a stale attempt",
+   "message": {
+    "op": "disconnect",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "epoch": 3
+   },
+   "valid": true
+  },
+  {
+   "name": "get a service",
+   "message": {
+    "op": "getPrimaryService",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "service": "00001826-0000-1000-8000-00805f9b34fb"
+   },
+   "valid": true
+  },
+  {
+   "name": "get a characteristic",
+   "message": {
+    "op": "getCharacteristic",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "service": "00001826-0000-1000-8000-00805f9b34fb",
+    "characteristic": "00002ad9-0000-1000-8000-00805f9b34fb"
+   },
+   "valid": true
+  },
+  {
+   "name": "start notifications",
+   "message": {
+    "op": "startNotifications",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "service": "00001826-0000-1000-8000-00805f9b34fb",
+    "characteristic": "00002ad2-0000-1000-8000-00805f9b34fb"
+   },
+   "valid": true
+  },
+  {
+   "name": "write request control with response",
+   "message": {
+    "op": "writeValue",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "service": "00001826-0000-1000-8000-00805f9b34fb",
+    "characteristic": "00002ad9-0000-1000-8000-00805f9b34fb",
+    "value": "AA==",
+    "withResponse": true
+   },
+   "valid": true
+  },
+  {
+   "name": "write RideOn without response",
+   "message": {
+    "op": "writeValue",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "service": "00000001-19ca-4651-86e5-fa29dcdd09d1",
+    "characteristic": "00000003-19ca-4651-86e5-fa29dcdd09d1",
+    "value": "UmlkZU9u",
+    "withResponse": false
+   },
+   "valid": true
+  },
+  {
+   "name": "report an unsupported member",
+   "message": {
+    "op": "reportUnsupported",
+    "method": "getAvailability"
+   },
+   "valid": true
+  },
+  {
+   "name": "unknown op",
+   "message": {
+    "op": "getAvailability"
+   },
+   "valid": false,
+   "error": "NotSupportedError"
+  },
+  {
+   "name": "missing op",
+   "message": {
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10"
+   },
+   "valid": false,
+   "error": "DataError"
+  },
+  {
+   "name": "connect without id",
+   "message": {
+    "op": "connect"
+   },
+   "valid": false,
+   "error": "DataError"
+  },
+  {
+   "name": "short UUID not normalised",
+   "message": {
+    "op": "getPrimaryService",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "service": "1826"
+   },
+   "valid": false,
+   "error": "DataError"
+  },
+  {
+   "name": "upper-case UUID",
+   "message": {
+    "op": "getPrimaryService",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "service": "00001826-0000-1000-8000-00805F9B34FB"
+   },
+   "valid": false,
+   "error": "DataError"
+  },
+  {
+   "name": "value over 512 bytes",
+   "message": {
+    "op": "writeValue",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "service": "00001826-0000-1000-8000-00805f9b34fb",
+    "characteristic": "00002ad9-0000-1000-8000-00805f9b34fb",
+    "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "withResponse": true
+   },
+   "valid": false,
+   "error": "DataError"
+  },
+  {
+   "name": "value not base64",
+   "message": {
+    "op": "writeValue",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "service": "00001826-0000-1000-8000-00805f9b34fb",
+    "characteristic": "00002ad9-0000-1000-8000-00805f9b34fb",
+    "value": "not base64!",
+    "withResponse": true
+   },
+   "valid": false,
+   "error": "DataError"
+  },
+  {
+   "name": "too many filters",
+   "message": {
+    "op": "requestDevice",
+    "filters": [
+     {
+      "namePrefix": "x"
+     },
+     {
+      "namePrefix": "x"
+     },
+     {
+      "namePrefix": "x"
+     },
+     {
+      "namePrefix": "x"
+     },
+     {
+      "namePrefix": "x"
+     },
+     {
+      "namePrefix": "x"
+     },
+     {
+      "namePrefix": "x"
+     },
+     {
+      "namePrefix": "x"
+     },
+     {
+      "namePrefix": "x"
+     }
+    ],
+    "optionalServices": []
+   },
+   "valid": false,
+   "error": "DataError"
+  },
+  {
+   "name": "too many services",
+   "message": {
+    "op": "requestDevice",
+    "filters": [
+     {
+      "services": [
+       "00001826-0000-1000-8000-00805f9b34fb"
+      ]
+     }
+    ],
+    "optionalServices": [
+     "00000000-0000-1000-8000-00805f9b34fb",
+     "00000001-0000-1000-8000-00805f9b34fb",
+     "00000002-0000-1000-8000-00805f9b34fb",
+     "00000003-0000-1000-8000-00805f9b34fb",
+     "00000004-0000-1000-8000-00805f9b34fb",
+     "00000005-0000-1000-8000-00805f9b34fb",
+     "00000006-0000-1000-8000-00805f9b34fb",
+     "00000007-0000-1000-8000-00805f9b34fb",
+     "00000008-0000-1000-8000-00805f9b34fb",
+     "00000009-0000-1000-8000-00805f9b34fb",
+     "0000000a-0000-1000-8000-00805f9b34fb",
+     "0000000b-0000-1000-8000-00805f9b34fb",
+     "0000000c-0000-1000-8000-00805f9b34fb",
+     "0000000d-0000-1000-8000-00805f9b34fb",
+     "0000000e-0000-1000-8000-00805f9b34fb",
+     "0000000f-0000-1000-8000-00805f9b34fb",
+     "00000010-0000-1000-8000-00805f9b34fb"
+    ]
+   },
+   "valid": false,
+   "error": "DataError"
+  },
+  {
+   "name": "name over 248 bytes",
+   "message": {
+    "op": "requestDevice",
+    "filters": [
+     {
+      "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+     }
+    ],
+    "optionalServices": []
+   },
+   "valid": false,
+   "error": "DataError"
+  },
+  {
+   "name": "empty filters",
+   "message": {
+    "op": "requestDevice",
+    "filters": [],
+    "optionalServices": []
+   },
+   "valid": false,
+   "error": "DataError"
+  },
+  {
+   "name": "epoch not an integer",
+   "message": {
+    "op": "disconnect",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "epoch": "3"
+   },
+   "valid": false,
+   "error": "DataError"
+  }
+ ],
+ "replies": [
+  {
+   "name": "device chosen",
+   "reply": {
+    "ok": true,
+    "value": {
+     "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+     "name": "KICKR CORE 1234"
+    }
+   }
+  },
+  {
+   "name": "granted devices",
+   "reply": {
+    "ok": true,
+    "value": [
+     {
+      "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+      "name": "KICKR CORE 1234"
+     }
+    ]
+   }
+  },
+  {
+   "name": "connected",
+   "reply": {
+    "ok": true,
+    "value": {
+     "epoch": 4
+    }
+   }
+  },
+  {
+   "name": "characteristic properties",
+   "reply": {
+    "ok": true,
+    "value": {
+     "properties": [
+      "write",
+      "indicate"
+     ]
+    }
+   }
+  },
+  {
+   "name": "done",
+   "reply": {
+    "ok": true,
+    "value": null
+   }
+  },
+  {
+   "name": "chooser cancelled",
+   "reply": {
+    "ok": false,
+    "error": {
+     "name": "NotFoundError",
+     "message": "No device selected."
+    }
+   }
+  },
+  {
+   "name": "service outside the grant",
+   "reply": {
+    "ok": false,
+    "error": {
+     "name": "SecurityError",
+     "message": "Service not allowed for this device."
+    }
+   }
+  },
+  {
+   "name": "link lost",
+   "reply": {
+    "ok": false,
+    "error": {
+     "name": "NetworkError",
+     "message": "Disconnected."
+    }
+   }
+  },
+  {
+   "name": "write type not supported",
+   "reply": {
+    "ok": false,
+    "error": {
+     "name": "NotSupportedError",
+     "message": "Characteristic does not support write."
+    }
+   }
+  }
+ ],
+ "events": [
+  {
+   "name": "indoor bike data",
+   "event": {
+    "type": "value",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "epoch": 4,
+    "service": "00001826-0000-1000-8000-00805f9b34fb",
+    "characteristic": "00002ad2-0000-1000-8000-00805f9b34fb",
+    "value": "RAAAAAAAAA=="
+   }
+  },
+  {
+   "name": "link dropped",
+   "event": {
+    "type": "disconnected",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "epoch": 4
+   }
+  },
+  {
+   "name": "advertisement seen",
+   "event": {
+    "type": "advertisement",
+    "watchId": "w1",
+    "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
+    "name": "Zwift Click",
+    "rssi": -61
+   }
+  }
+ ]
+}

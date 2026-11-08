@@ -1,0 +1,57 @@
+name: PigRider
+options:
+  bundleIdPrefix: com.maroge1990
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  PigRider:
+    type: application
+    platform: iOS
+    sources:
+      - path: PigRider
+      - path: web/bluetooth-bridge.js
+        buildPhase: resources
+      - path: BRIDGE_VERSION
+        buildPhase: resources
+    info:
+      path: build/generated/Info.plist
+      properties:
+        CFBundleDisplayName: PigRider
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSBluetoothAlwaysUsageDescription: PigRider connects to your smart trainer, heart rate strap and controllers.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.maroge1990.pigrider
+        TARGETED_DEVICE_FAMILY: "2"
+        CODE_SIGN_STYLE: Automatic
+  PigRiderTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: PigRiderTests
+      - path: web/test/fixtures/protocol.json
+        buildPhase: resources
+    dependencies:
+      - target: PigRider
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  PigRider:
+    build:
+      targets:
+        PigRider: all
+        PigRiderTests: [test]
+    test:
+      targets:
+        - PigRiderTests

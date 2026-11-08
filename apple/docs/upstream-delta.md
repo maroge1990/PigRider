@@ -7,4 +7,5 @@ short; check it after each upstream merge (`git diff --stat upstream/main -- . '
 | --- | --- | --- |
 | `AGENTS.md` | "PigRider fork" section at the end | Points agents at `apple/AGENTS.md` |
 | `CLAUDE.md` | New, `@AGENTS.md` only | Claude Code loads AGENTS.md |
-| `.gitignore` | `CLAUDE.local.md` | Local agent notes stay out of git |
+| `.gitignore` | `CLAUDE.local.md`; `apple/*.xcodeproj/`, `apple/build/` | Local agent notes and generated Xcode files stay out of git |
+| `.github/workflows/apple.yml` | New | CI for the bridge polyfill tests (the Swift build runs on the Mac) |
