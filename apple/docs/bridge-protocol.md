@@ -98,8 +98,13 @@ not guaranteed. These rules make every interleaving safe.
 
 - **Cancels drain.** After Swift cancels a link, a `connect` gets its epoch at
   once but waits until CoreBluetooth answers the cancel (`didDisconnect` or
-  `didFailToConnect`, or 6 s pass); a `didConnect` or GATT callback meanwhile
-  belongs to the cancelled link and is ignored.
+  `didFailToConnect`); a `didConnect` or GATT callback meanwhile belongs to
+  the cancelled link and is ignored. If no answer comes within 6 s, Swift
+  reads the peripheral's own state: if it is `disconnected`, the waiting
+  connects go ahead; otherwise Swift cancels again, rejects them with
+  `NetworkError` (the page retries), and every later `connect` rejects the
+  same way until CoreBluetooth answers or reports the peripheral
+  `disconnected`. A timer alone never ends the drain.
 
 ## GATT operations and timeouts
 

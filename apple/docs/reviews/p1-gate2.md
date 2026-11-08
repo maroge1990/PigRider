@@ -37,3 +37,17 @@ CoreBluetooth's `peripheral.state` decides: `.disconnected` ends it; anything
 else cancels again, rejects queued attempts with `NetworkError` (the page
 retries) and keeps draining until a terminal callback or a later check finds
 `.disconnected`.
+
+Fixed (9653195): `PeripheralHandle.state`; at the timeout only
+`.disconnected` ends the drain; otherwise cancel again, reject queued
+connects with `NetworkError`, keep draining, and reject later connects until
+CoreBluetooth answers or reports `.disconnected`. Tests: Codex's sequence for
+`.connecting`, `.connected` and `.disconnecting`; the `.disconnected`
+variant; connects after an expired drain; the document-reload variant; the
+state mapping. 187 Swift tests pass.
+
+Deferral replaced: the old first row is withdrawn. New deferred item:
+
+| Item | Why deferred | Where tracked |
+| --- | --- | --- |
+| State reads `.disconnected` at the timeout but the old `didDisconnect` is still queued: that callback fails the new attempt once with `NetworkError` (the page retries; no session exists to mix) | Whether CoreBluetooth ever reports this state ahead of its callback is only observable on hardware | `apple/docs/hardware-checklist.md`, last item |
