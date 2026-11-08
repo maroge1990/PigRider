@@ -25,3 +25,10 @@ Findings 1 and 2: fixed as designed, but two gaps remained.
 | --- | --- | --- | --- |
 | 3 | high | Two uploads of one commit in the same second got the same folder (`mkdir -p` reuses it); one could delete it while the other still built there. | **Fixed.** The folder comes from `mktemp -d` on the Mac, so it is never shared; `mac.sh` checks the returned path's shape before using it. Two uploads in the same second still get the same build number: App Store Connect rejects the second as a duplicate, so it fails loudly and a rerun gets a new number. |
 | 4 | high | The commit label was read before the snapshot, which resolved `HEAD` again: a checkout in between would upload one tree labelled as another commit. | **Fixed.** `HEAD` is resolved once to a full SHA; the label is its prefix and `git archive` takes `<sha>:apple`. |
+
+## Sign-off, verdict: approve
+
+Codex: findings 1–4 and the empty-snapshot bug fixed (yes); finding 3's
+residual case (same-second uploads share a build number; App Store Connect
+rejects the second, a rerun gets a new one) accepted without a lock; no
+regression found. Gate passed.
