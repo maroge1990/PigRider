@@ -12,3 +12,8 @@ first, then Gate 2. Base `9a7cfcc`, change `ec491da`.
 
 Checks after the fix: `make -C apple check` (132 bridge tests, 197 Swift tests),
 `make check` (upstream lint and tests).
+
+## Round 2 (fixes only), verdict: approve
+
+Fix `832f35f` checked against round 1: the finding is resolved, no in-scope
+regression. No findings.
