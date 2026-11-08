@@ -21,3 +21,19 @@ Both fixes resolve their findings; no new high-severity issue.
 | A cancel answered only after the 6 s drain fallback fails the next attempt once (page retries; sessions never mix) | Depends on real CoreBluetooth timing; only hardware shows it | `apple/docs/hardware-checklist.md`, last item |
 | `apple/web/` is not linted | Tooling gap that existed before this change, no behaviour impact | `apple/docs/roadmap.md` backlog |
 | Ride file downloads in the web view | Not needed for P1; uploads are server-side | `apple/docs/roadmap.md` backlog |
+
+## Sign-off 1, 2026-11-08: needs-attention
+
+- Finding 2: fixed, no regression (bluetooth-bridge.js 194–224; tests in
+  polyfill.test.js and upstreamContract.test.js).
+- Deferrals: lint and downloads accepted.
+- Finding 1 / first deferral **contested**: the 6 s drain timeout ends the
+  quarantine without a cancel acknowledgement, so a late `didConnect` and
+  GATT callbacks of the cancelled link can still be taken as the next
+  attempt's. Not limited to one failed attempt.
+
+Fix (in progress): the timer alone never ends the drain. At the timeout,
+CoreBluetooth's `peripheral.state` decides: `.disconnected` ends it; anything
+else cancels again, rejects queued attempts with `NetworkError` (the page
+retries) and keeps draining until a terminal callback or a later check finds
+`.disconnected`.
