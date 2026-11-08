@@ -30,7 +30,10 @@ if [ "$cmd" = testflight ]; then
   # A snapshot of HEAD's apple/ in its own folder on the Mac: no other run can change what is uploaded.
   work=build/PigRider-release/$build-$commit
   ssh "$host" "mkdir -p $work"
-  git -C "$here" archive --format=tar --prefix=apple/ HEAD:apple | ssh "$host" "tar -x -C $work"
+  # From the repo root: run inside apple/, git archive limits itself to that folder and finds nothing.
+  git -C "$here/.." archive --format=tar --prefix=apple/ HEAD:apple | ssh "$host" "tar -x -C $work"
+  ssh "$host" "test -f $work/apple/project.yml && test -x $work/apple/scripts/signed.sh" \
+    || { echo "The snapshot on the Mac is incomplete." >&2; exit 1; }
   echo "TestFlight build $build from $commit"
   ssh -t "$host" "cd $work/apple && PIGRIDER_BUILD=$build PIGRIDER_COMMIT=$commit scripts/signed.sh testflight"
   ssh "$host" "rm -rf $work"
