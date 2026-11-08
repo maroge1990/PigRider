@@ -22,7 +22,8 @@ Strava and intervals.icu.
 - The Mac is reachable as `ssh mac` (Apple Silicon, Xcode 27, iOS 27 simulators,
   paid developer account). It has no node or cargo; JS and Rust run here.
 - iOS builds and tests run on the Mac with `xcodebuild` (script added in P1).
-- The server runs on `passyflix` (Docker Compose behind its existing HTTPS proxy).
+- The server runs on `passyflix` (Docker Compose), reached over plain HTTP on the
+  home network only (ADR 0001).
 
 ## Review process (every change)
 The full process is [ADR 0002](docs/adr/0002-fork-maintenance-and-review-gate.md). In short:

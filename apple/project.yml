@@ -31,6 +31,10 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         NSBluetoothAlwaysUsageDescription: PigRider connects to your smart trainer, heart rate strap and controllers.
+        # Plain HTTP to the home server only (ServerSettings/HomeNetwork); ATS stays on elsewhere.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: PigRider loads your ride server from your home network.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.maroge1990.pigrider

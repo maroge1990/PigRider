@@ -32,8 +32,10 @@ top of `make check`.
 
 ## The web view
 
-- Loads `https://<server>/` from a server URL entered once in the app's settings
-  (stored in `UserDefaults`, HTTPS only, ATS left on). The default data store
+- Loads the server URL entered once in the app's settings (stored in
+  `UserDefaults`): `https://` anywhere, or `http://` for a home-network host
+  (private address, `.local` name or a name without a dot; see ADR 0001). ATS
+  stays on apart from `NSAllowsLocalNetworking`. The default data store
   persists `localStorage` and cookies, so the rider profile, known devices and
   the Strava session survive restarts.
 - `isIdleTimerDisabled = true` while the web view is in the foreground.

@@ -4,6 +4,10 @@ Run on the iPad with a development build, mirrored to the Apple TV. Note the
 result of each line (✅ / ❌ + what happened) in the PR. On any ❌, use
 *Device diagnostics → Copy report* in the app and paste it into the PR.
 
+## Server
+- [ ] First launch: iOS asks for Local Network access; after allowing, the start page loads from `http://` on passyflix
+- [ ] Settings refuses an `http://` address outside the home network (e.g. `http://example.com`)
+
 ## Pairing
 - [ ] KICKR Core appears in the chooser; connects; power and cadence shown
 - [ ] Polar strap appears; heart rate shown

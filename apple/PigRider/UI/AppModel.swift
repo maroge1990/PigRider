@@ -41,7 +41,7 @@ final class AppModel {
         } catch {
             switch error {
             case .invalid: return "That is not a server address."
-            case .notHTTPS: return "The server must use \(ServerSettings.scheme)://."
+            case .httpNotLocal: return "Plain http:// only works for addresses on your home network, such as 192.168.1.20 or passyflix.local. Use https:// for anything else."
             }
         }
     }

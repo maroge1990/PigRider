@@ -27,21 +27,14 @@ enum Origin {
     }
 }
 
-/// The self-hosted server the web view loads. HTTPS only (ATS stays on).
+/// The self-hosted server the web view loads: HTTPS anywhere, or plain HTTP
+/// on the home network (see `HomeNetwork`; ATS allows only that exception).
 @MainActor
 final class ServerSettings {
     enum Failure: Error, Equatable {
         case invalid
-        case notHTTPS
+        case httpNotLocal
     }
-
-    /// The scheme rule, in one place: the only scheme a server URL may use,
-    /// also assumed for a bare `host[:port]`. Everything downstream (origin,
-    /// navigation policy, bridge origin check) works on canonical origins and
-    /// accepts http as well. Allowing plain HTTP would change this rule (and
-    /// `defaultPort`) and add an ATS exception in `project.yml`.
-    static let scheme = "https"
-    static let defaultPort = 443
 
     static let key = "serverURL"
     private let store: any KeyValueStoring
@@ -66,22 +59,29 @@ final class ServerSettings {
         return url
     }
 
-    /// Accepts `https://host[:port][/path]` or a bare `host[:port]`; drops query
-    /// and fragment, lowercases the host, leaves out the default port.
+    /// Accepts `http(s)://host[:port][/path]` or a bare `host[:port]` (HTTP
+    /// for a home-network host, HTTPS otherwise); drops query and fragment,
+    /// lowercases the host, leaves out the default port.
     static func normalise(_ input: String) throws(Failure) -> URL {
-        var text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw .invalid }
-        if !text.contains("://") { text = "\(scheme)://" + text }
-        guard var parts = URLComponents(string: text), let given = parts.scheme?.lowercased() else { throw .invalid }
-        guard given == scheme else { throw given == "http" ? .notHTTPS : .invalid }
-        guard let host = parts.host, !host.isEmpty, parts.user == nil, parts.password == nil else { throw .invalid }
+        let bare = !text.contains("://")
+        guard var parts = URLComponents(string: bare ? "https://" + text : text),
+              let host = parts.percentEncodedHost?.lowercased(), !host.isEmpty,
+              parts.user == nil, parts.password == nil else { throw .invalid }
+        let scheme = bare ? (HomeNetwork.contains(host: host) ? "http" : "https") : parts.scheme?.lowercased()
+        switch scheme {
+        case "https": break
+        case "http": guard HomeNetwork.contains(host: host) else { throw .httpNotLocal }
+        default: throw .invalid
+        }
         parts.scheme = scheme
-        parts.host = host.lowercased()
-        if parts.port == defaultPort { parts.port = nil }
+        parts.percentEncodedHost = host
+        if parts.port == (scheme == "https" ? 443 : 80) { parts.port = nil }
         parts.query = nil
         parts.fragment = nil
         if parts.path.isEmpty { parts.path = "/" }
-        guard let url = parts.url else { throw .invalid }
+        guard let url = parts.url, Origin.canonical(url) != nil else { throw .invalid }
         return url
     }
 }

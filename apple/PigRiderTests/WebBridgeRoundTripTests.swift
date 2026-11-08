@@ -67,6 +67,7 @@ final class AutoPickPresenter: ChooserPresenting {
 final class RoundTripPage: NSObject, WKNavigationDelegate {
     static let origin = "https://bridge.test"
 
+    let origin: String
     let central = FakeCentral()
     let kickr = FakePeripheral(id: kickrID, name: "KICKR CORE 1234")
     let presenter = AutoPickPresenter()
@@ -75,14 +76,15 @@ final class RoundTripPage: NSObject, WKNavigationDelegate {
     let webView: WKWebView
     private var loading: CheckedContinuation<Void, any Error>?
 
-    init(polyfill: BridgePolyfill) {
+    init(polyfill: BridgePolyfill, origin: String = RoundTripPage.origin) {
+        self.origin = origin
         let sink = PageEventSink()
         bridge = BluetoothBridge(central: central, grants: GrantStore(store: InMemoryStore()), events: sink,
                                  chooser: presenter, scheduler: FakeScheduler())
         gate = ReplyGate(bridge)
-        let handler = BridgeMessageHandler(bridge: gate, origin: Self.origin)
+        let handler = BridgeMessageHandler(bridge: gate, origin: origin)
         webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 400, height: 300),
-                            configuration: BridgeWebConfiguration.make(polyfill: polyfill, origin: Self.origin,
+                            configuration: BridgeWebConfiguration.make(polyfill: polyfill, origin: origin,
                                                                        handler: handler))
         sink.page = webView
         super.init()
@@ -221,6 +223,26 @@ struct WebBridgeRoundTripTests {
 
         #expect(try await page.run("return await attempt") as? String == "NetworkError")
         #expect(try await page.run("return device.gatt.connected") as? Bool == false)
+    }
+
+    @Test func aHomeServerOverPlainHTTPGetsAWorkingBridge() async throws {
+        let page = RoundTripPage(polyfill: try BridgePolyfill.bundled(), origin: "http://192.168.1.20:8080")
+        try await page.load(baseURL: "http://192.168.1.20:8080/")
+        let connected = try await page.run("""
+            const device = await navigator.bluetooth.requestDevice({ filters: [{ services: [0x1826] }] });
+            await device.gatt.connect();
+            return device.gatt.connected;
+            """)
+        #expect(connected as? Bool == true)
+    }
+
+    @Test func theHTTPTwinOfAnHTTPSServerGetsNoBluetooth() async throws {
+        try await page.load(baseURL: "http://bridge.test")
+        #expect(try await page.run("return typeof navigator.bluetooth") as? String == "undefined")
+        let reply = try await page.run("return await window.webkit.messageHandlers.ble.postMessage({ op: 'getDevices' })")
+        let error = (reply as? [String: Any])?["error"] as? [String: Any]
+        #expect(error?["name"] as? String == "SecurityError")
+        #expect(page.gate.calls.isEmpty)
     }
 
     @Test func anotherOriginGetsNoBluetoothAndItsMessagesAreRejected() async throws {

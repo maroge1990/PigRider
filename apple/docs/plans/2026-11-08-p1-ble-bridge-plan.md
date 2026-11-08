@@ -86,7 +86,7 @@ the device ends disconnected and reconnecting, never "connected".
 matching against an advertisement (services, name, prefix, manufacturer
 company id); `BridgeCall` decoding and limits (from `protocol.json`);
 `GrantStore` keyed by (origin, id) over a `KeyValueStoring` fake;
-`ServerSettings` (HTTPS only, canonical origin); `NavigationPolicy` (server
+`ServerSettings` (HTTPS, or HTTP for home-network hosts since 2026-11-09; canonical origin); `NavigationPolicy` (server
 origin and `www.strava.com` in the web view, everything else in Safari).
 
 **T5. Swift, scanning.** `ScanCoordinator` with consumers (chooser, watches):
@@ -140,7 +140,7 @@ Gate 2 runs on the whole branch.
 
 - Xcode on the Mac knows only the free Personal Team; installing on the iPad
   needs the paid team signed in (Mark), before T8.
-- T7 and T8 need the client served over HTTPS. The Mac has no Rust or node,
-  so the basic server deployment on passyflix (Docker Compose behind its
-  existing proxy, no Strava yet) moves forward from P2 to before T7, with
-  Mark's OK. Its hostname and certificate are Mark's to choose.
+- T8 needs the server on passyflix. Mark chose (2026-11-09) plain HTTP on the
+  home network: the app accepts `http://` for home-network hosts (ADR 0001),
+  and the basic deployment (Docker Compose, no Strava yet) moves forward from
+  P2 to before T8, with Mark's OK.

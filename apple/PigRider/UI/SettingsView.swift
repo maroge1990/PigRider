@@ -11,7 +11,7 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("\(ServerSettings.scheme)://ride.example.com", text: $address)
+                    TextField("http://192.168.1.20:8080", text: $address)
                         .keyboardType(.URL)
                         .textContentType(.URL)
                         .textInputAutocapitalization(.never)
@@ -20,7 +20,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Server")
                 } footer: {
-                    Text(error ?? "The address of your PigRider server.")
+                    Text(error ?? "The address of your PigRider server: http:// on your home network, otherwise https://.")
                         .foregroundStyle(error == nil ? Color.secondary : Color.red)
                 }
                 Section {
