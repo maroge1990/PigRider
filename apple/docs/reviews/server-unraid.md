@@ -17,3 +17,8 @@ Findings 1 and 2: resolved.
 | # | Severity | Finding | Resolution |
 | --- | --- | --- | --- |
 | 3 | high | With parallel `main` builds, the head check and the `:latest` push are not serialised: an older run can pass the check, stall, and overwrite a newer `:latest`. | **Fixed by removal.** Nothing uses `:latest` (Unraid follows `:release`; a release promotes `:sha-<commit>`), so the workflow no longer publishes it. No shared mutable tag is left in the build; `:release` moves only in `pigrider-release.yml`, whose concurrency group serialises runs. |
+
+## Sign-off, verdict: approve
+
+Codex: findings 1–3 fixed (yes), resolutions accepted (removing `:latest`
+accepted, since nothing consumes it), no regression found. Gate passed.
