@@ -9,6 +9,7 @@
 //! | `/api/studio`      | Spin studio classes and the upcoming timetable       |
 //! | `/ws`              | WebSocket game protocol                              |
 //! | `/auth/*`, `/api/me`, `/api/strava/*` | Strava account and uploads (see [`crate::auth`]) |
+//! | `/api/intervals/upload` | intervals.icu upload with the operator's key (see [`crate::intervals`]) |
 //! | `/*`               | Browser client (only if a static dir is set)         |
 
 use crate::afk::{AfkCounts, AfkStats};
@@ -42,7 +43,7 @@ use tower_http::trace::TraceLayer;
 /// Largest WebSocket message a client may send.
 const MAX_MESSAGE_BYTES: usize = 16 * 1024;
 /// Largest ride file for uploads (a 4-hour ride is about 3 MB of TCX).
-const MAX_UPLOAD_BYTES: usize = 16 * 1024 * 1024;
+pub(crate) const MAX_UPLOAD_BYTES: usize = 16 * 1024 * 1024;
 
 /// Shared limits that protect the server from floods and scripts.
 pub struct Protection {
@@ -79,6 +80,8 @@ pub struct AppState {
     pub protection: Arc<Protection>,
     /// `None` when the server has no Strava API app configured.
     pub strava: Option<Arc<Strava>>,
+    /// `None` when the server has no intervals.icu key.
+    pub intervals: Option<Arc<crate::intervals::Intervals>>,
     pub allow_simulated_trainer: bool,
     pub allow_paddle_mode: bool,
     /// Community distance totals (#65).
@@ -106,6 +109,7 @@ pub struct InfoResponse {
     pub route: RouteSummary,
     pub routes: Vec<RouteSummary>,
     pub strava: StravaInfo,
+    pub intervals: IntervalsInfo,
     /// Server clock (Unix seconds), to read `events` against.
     pub now_s: f64,
     /// Scheduled events of all worlds, soonest start first.
@@ -140,6 +144,12 @@ pub struct StravaInfo {
     pub enabled: bool,
     /// Joining needs a connected Strava account.
     pub required: bool,
+}
+
+/// Whether the finish screen offers *Upload to intervals.icu*.
+#[derive(Debug, Serialize)]
+pub struct IntervalsInfo {
+    pub enabled: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -295,6 +305,7 @@ pub fn router(state: AppState, static_dir: Option<&Path>, headers: &[(header::He
             post(auth::upload).layer(DefaultBodyLimit::max(MAX_UPLOAD_BYTES)),
         )
         .route("/api/strava/upload/{id}", get(auth::upload_status))
+        .route("/api/intervals/upload", post(crate::intervals::upload))
         .with_state(state);
 
     let router = match static_dir {
@@ -422,6 +433,9 @@ async fn info(State(state): State<AppState>) -> Json<InfoResponse> {
         strava: StravaInfo {
             enabled: state.strava.is_some(),
             required: state.strava.as_ref().is_some_and(|s| s.required),
+        },
+        intervals: IntervalsInfo {
+            enabled: state.intervals.is_some(),
         },
         now_s,
         events,

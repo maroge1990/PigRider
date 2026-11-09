@@ -10,6 +10,7 @@
 //! * [`worlds`] — one world (and game loop) per route, plus the spin studio
 //! * [`map_file`] — road network files of shared maps, served to clients
 //! * [`auth`], [`strava`], [`strava_api`] — optional Strava account and uploads
+//! * [`intervals`] — optional intervals.icu uploads with the operator's API key
 //! * [`stats`] — community distance counters, kept across restarts
 //! * [`runtime`] — async game loop task and its command channel
 //! * [`game`] — synchronous game core: clients, broadcasts, resistance
@@ -31,6 +32,7 @@ pub mod guard;
 pub mod headers;
 pub mod healthcheck;
 pub mod http;
+pub mod intervals;
 pub mod map_file;
 pub mod obn;
 pub mod players;

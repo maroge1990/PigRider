@@ -294,6 +294,17 @@ pub fn build_with_stats(config: &Config) -> Result<(Router, DistanceStats), BoxE
         None => None,
     };
 
+    let intervals = match &config.intervals {
+        Some(intervals_config) => {
+            tracing::info!("intervals.icu upload enabled (the operator's account)");
+            Some(Arc::new(crate::intervals::Intervals::new(
+                intervals_config.clone(),
+                env!("CARGO_PKG_VERSION"),
+            )?))
+        }
+        None => None,
+    };
+
     let state = AppState {
         worlds: Arc::new(worlds),
         maps: Arc::new(maps),
@@ -309,6 +320,7 @@ pub fn build_with_stats(config: &Config) -> Result<(Router, DistanceStats), BoxE
             limits: config.connection_limits(),
         }),
         strava,
+        intervals,
         allow_simulated_trainer: config.allow_simulated_trainer,
         allow_paddle_mode: config.allow_paddle_mode,
         stats: stats.clone(),

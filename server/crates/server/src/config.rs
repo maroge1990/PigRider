@@ -4,6 +4,7 @@
 //! lookup as a function. Production passes `std::env::var`, tests pass a map.
 
 use crate::guard::ConnectionLimits;
+use crate::intervals::{ApiKey, IntervalsConfig};
 use crate::obn::link::Heartbeat;
 use crate::strava::StravaConfig;
 use openradlr_sim::SimConfig;
@@ -80,6 +81,8 @@ pub struct Config {
     pub public_url: Option<String>,
     /// "Connect with Strava", if a Strava API app is configured.
     pub strava: Option<StravaConfig>,
+    /// Uploads to intervals.icu with the operator's API key (`OPENRADLR_INTERVALS_API_KEY`).
+    pub intervals: Option<IntervalsConfig>,
     /// Where Strava logins are kept so they survive restarts (`OPENRADLR_DATA_DIR`, with the key).
     pub data_dir: Option<std::path::PathBuf>,
     /// Encrypts the stored Strava refresh tokens (`OPENRADLR_SECRET_KEY`).
@@ -309,6 +312,24 @@ impl Config {
                 })
             }
         };
+        // One key for the whole server: meant for a private server with one rider.
+        let intervals = match reader.raw("OPENRADLR_INTERVALS_API_KEY").filter(|v| !v.is_empty()) {
+            None => None,
+            Some(key) => {
+                let Some(url) = &public_url else {
+                    return Err(ConfigError {
+                        key: "OPENRADLR_INTERVALS_API_KEY",
+                        value: "(hidden)".into(),
+                        reason: "needs OPENRADLR_PUBLIC_URL (uploads are accepted from that page only)".into(),
+                    });
+                };
+                Some(IntervalsConfig {
+                    api_key: ApiKey::new(key),
+                    base_url: crate::intervals::DEFAULT_BASE_URL.into(),
+                    public_url: url.clone(),
+                })
+            }
+        };
         let data_dir = reader
             .raw("OPENRADLR_DATA_DIR")
             .filter(|v| !v.is_empty())
@@ -439,6 +460,7 @@ impl Config {
             allowed_origins,
             public_url,
             strava,
+            intervals,
             data_dir,
             secret_key,
             stats_file,
@@ -766,6 +788,27 @@ mod tests {
             config(&[("OPENRADLR_MAX_CONNECTIONS_PER_IP", "0")]).unwrap_err().key,
             "OPENRADLR_MAX_CONNECTIONS_PER_IP"
         );
+    }
+
+    #[test]
+    fn an_intervals_key_uploads_for_the_public_url() {
+        assert_eq!(config(&[]).unwrap().intervals, None);
+        let c = config(&[
+            ("OPENRADLR_INTERVALS_API_KEY", "s3cret-key"),
+            ("OPENRADLR_PUBLIC_URL", "http://192.168.1.235:8080/"),
+        ])
+        .unwrap();
+        let intervals = c.intervals.clone().unwrap();
+        assert_eq!(intervals.public_url, "http://192.168.1.235:8080");
+        assert_eq!(intervals.base_url, "https://intervals.icu");
+        assert!(!format!("{c:?}").contains("s3cret-key"));
+    }
+
+    #[test]
+    fn an_intervals_key_needs_the_public_url_and_stays_hidden() {
+        let error = config(&[("OPENRADLR_INTERVALS_API_KEY", "s3cret-key")]).unwrap_err();
+        assert_eq!(error.key, "OPENRADLR_INTERVALS_API_KEY");
+        assert!(!error.to_string().contains("s3cret-key"));
     }
 
     #[test]
