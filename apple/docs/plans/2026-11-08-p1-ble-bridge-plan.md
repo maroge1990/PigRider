@@ -9,7 +9,7 @@ Every task is test-first. `make -C apple check` must pass after each task.
 
 - **XcodeGen** (`apple/project.yml`) generates the project on the Mac; the
   `.xcodeproj` is gitignored, so there are no `project.pbxproj` merge conflicts.
-- iPadOS 18+ deployment target, iPad only, landscape. Swift 6 language mode;
+- iPadOS 17+ deployment target (raised from 18 on 2026-11-09), iPad only, landscape. Swift 6 language mode;
   the bridge is `@MainActor` and CoreBluetooth runs on the main queue.
 - **Swift Testing** for unit tests, on the iPad Pro 11" (M5) simulator.
   The simulator has no Bluetooth, so every CoreBluetooth type sits behind a
