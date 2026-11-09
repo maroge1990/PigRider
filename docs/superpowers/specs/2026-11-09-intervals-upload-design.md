@@ -18,6 +18,8 @@ which rides synced in from Strava are not.
 | Meant for | Private servers with one rider. Every rider who can open the page uploads to the operator's account, so the docs say not to set it on a server others ride on. A public server keeps Strava only |
 | What gets uploaded | The same FIT file the Strava upload sends (`recorder.toFit`, virtual ride, splits). Riders measured by a real trainer only, as for Strava |
 | Route | `POST /api/intervals/upload?name=…`, body the FIT (or TCX) file, same body limit as Strava's. Answers `{ "activity_id": "<id>" \| null }` |
+| Who may call it | Only the server's own page. The request's `Origin` must equal the origin of `OPENRADLR_PUBLIC_URL` (scheme, host, port); a missing, `null` or other `Origin` is 403 `foreign_origin`. And the `Content-Type` must be `application/vnd.ant.fit` or `application/vnd.garmin.tcx+xml` (415 otherwise), so a cross-site form or `text/plain` post cannot get through, and a cross-site `fetch` needs a CORS preflight the server never grants. Both checks run before the body is read or intervals.icu is contacted |
+| Needs | `OPENRADLR_PUBLIC_URL`: setting the key without it is a config error at startup |
 | Off | Without the key: `/api/intervals/*` answers 404 `intervals_disabled`, and `/api/info` has `intervals: { enabled: false }` |
 | Upstream call | `POST https://intervals.icu/api/v1/athlete/0/activities?name=…&description=…`, multipart field `file`, HTTP Basic auth user `API_KEY`, password the key. Description: `Ridden on OpenRadlr: <public URL>` when `OPENRADLR_PUBLIC_URL` is set, otherwise none |
 | Activity id | Read best-effort from the reply (`id`, or `activities[0].id`, a string). The intervals.icu docs do not state the reply's shape, so a missing id is not an error: the client then says "Uploaded" without a link |
@@ -51,19 +53,32 @@ Out:
 The key can add activities to the operator's intervals.icu account (and,
 being a personal API key, read and change it). It lives only in the server's
 environment. The route never echoes it, logs redact it, and config errors
-print `(hidden)`. The route itself has no rider check: on a private server
-everyone who reaches it is the operator (home-network threat model). The risk
-on a misconfigured public server is junk activities in the operator's account,
-which is why the docs and the `.env.example` comment say private servers only.
+print `(hidden)`, and the key's type redacts itself in `Debug`.
+
+There is no rider sign-in: on a private server everyone who opens the page is
+the operator (home-network threat model). Two things that model does not
+cover are handled:
+
+- **Other web pages** (CSRF): a page the operator visits elsewhere could post a
+  ride file to the home server, which needs no cookie. The `Origin` and
+  `Content-Type` checks above refuse it. Non-browser callers must send the
+  server's `Origin` themselves; anyone who can do that can already reach the
+  server and is inside the threat model.
+- **A public server with the key set** by mistake: any rider could add
+  activities to the operator's account. The docs and the `.env.example`
+  comment say private servers only.
 
 ## Testing
 
-- Server unit tests: config (key optional, hidden in errors), reply parsing
+- Server unit tests: config (key optional, needs the public URL, hidden in errors and `Debug`), reply parsing
   (both id shapes, none), error mapping (401, 403, 429, 500, timeout),
   description with and without a public URL.
 - Server end-to-end test: the real router against a local fake intervals.icu
   (axum on 127.0.0.1): checks the path, Basic auth, multipart `file`, `name`;
-  `/api/info` reports `enabled`; 404 when off; a non-ride body is 400.
+  `/api/info` reports `enabled`; 404 when off; a non-ride body is 400. A
+  foreign, `null` or missing `Origin`, and a `text/plain` TCX post from the
+  right origin, are refused without the fake being contacted. A same-origin
+  FIT upload succeeds.
 - Client tests (plain node, fake fetch): `IntervalsClient.upload` sends the
   file and name and returns the id; error replies become errors with the
   server's message; the button's visibility rule as a pure function.
