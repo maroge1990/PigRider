@@ -25,6 +25,9 @@ for _ in $(seq 60); do
 done
 [ -n "$info" ] || fail "no answer on /api/info"
 grep -q '"PigRider"' <<<"$info" || fail "/api/info does not name the server: $info"
-curl -fsS "$origin/" | grep -qi "<html" || fail "no client page at /"
+# Fetch first, then search: `curl | grep -q` fails at random under pipefail, as
+# grep stops reading at the first match and curl dies writing the rest (error 23).
+page=$(curl -fsS "$origin/") || fail "no answer at /"
+grep -qi "<html" <<<"$page" || fail "no client page at /"
 docker exec "$name" openradlr-server healthcheck >/dev/null || fail "the image's healthcheck failed"
 echo "smoke test passed: $image"
