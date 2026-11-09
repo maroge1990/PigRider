@@ -58,6 +58,9 @@ the repo. After changing them: *Apply*, which restarts the container.
    goes to that account, so it suits a server only Mark rides on. The upload
    is accepted only from the page at *Public URL*: keep that exact.
 
-If the template on passyflix predates these fields, copy the new
-`my-PigRider.xml` over it first (see *First install*) and *Apply*; existing
-values are kept.
+On an existing install, add the three fields by hand: Unraid → Docker →
+PigRider → *Edit* → *Add another Path, Port, Variable…* → *Variable*, with the
+keys `OPENRADLR_STRAVA_CLIENT_ID`, `OPENRADLR_STRAVA_CLIENT_SECRET` and
+`OPENRADLR_INTERVALS_API_KEY` (mask the two secrets). **Never copy the repo's
+`my-PigRider.xml` over the saved one**: the saved file holds the container's
+values, and overwriting it would blank the secret key and log Strava out.
