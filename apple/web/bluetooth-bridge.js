@@ -1,6 +1,7 @@
 // The navigator.bluetooth polyfill: the part of Web Bluetooth that upstream's
 // client/public/js/ble/ uses, on top of the native bridge described in
-// apple/docs/bridge-protocol.md.
+// apple/docs/bridge-protocol.md. Over plain HTTP, where WebKit has no
+// navigator.clipboard, it also provides clipboard.writeText (op copyText).
 //
 // A classic script (the app injects it as a WKUserScript) that defines one
 // function and nothing else. The app appends a line that runs it:
@@ -27,6 +28,7 @@ function installPigriderBluetooth(target, { origin, version, channel } = {}) {
     "startNotifications",
     "writeValue",
     "reportUnsupported",
+    "copyText",
   ]);
   const BASE_UUID_TAIL = "-0000-1000-8000-00805f9b34fb";
   const FULL_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -530,6 +532,19 @@ function installPigriderBluetooth(target, { origin, version, channel } = {}) {
   const handlers = { value: onValue, disconnected: onDisconnected, advertisement: onAdvertisement };
 
   Object.defineProperty(target.navigator, "bluetooth", { value: new Bluetooth(), configurable: true, enumerable: true });
+  // WebKit offers navigator.clipboard only in a secure context. Over plain HTTP at home
+  // the app copies instead: only on a tap (transient user activation), like a browser,
+  // and the app then asks the rider (Copy / Cancel), since it can't see the tap.
+  if (!target.navigator.clipboard) {
+    const clipboard = Object.freeze({
+      async writeText(data) {
+        const activation = target.navigator.userActivation;
+        if (!activation || !activation.isActive) throw fail("NotAllowedError", "Copying needs a tap.");
+        await call("copyText", { text: String(data) });
+      },
+    });
+    Object.defineProperty(target.navigator, "clipboard", { value: clipboard, configurable: true, enumerable: true });
+  }
   Object.defineProperty(target, "__pigriderBle", {
     value: Object.freeze({
       dispatch(event) {

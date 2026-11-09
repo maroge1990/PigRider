@@ -71,6 +71,7 @@ final class RoundTripPage: NSObject, WKNavigationDelegate {
     let central = FakeCentral()
     let kickr = FakePeripheral(id: kickrID, name: "KICKR CORE 1234")
     let presenter = AutoPickPresenter()
+    let prompts = CopyPrompts()
     let bridge: BluetoothBridge
     let gate: ReplyGate
     let webView: WKWebView
@@ -80,7 +81,7 @@ final class RoundTripPage: NSObject, WKNavigationDelegate {
         self.origin = origin
         let sink = PageEventSink()
         bridge = BluetoothBridge(central: central, grants: GrantStore(store: InMemoryStore()), events: sink,
-                                 chooser: presenter, scheduler: FakeScheduler())
+                                 chooser: presenter, scheduler: FakeScheduler(), copyPrompt: prompts)
         gate = ReplyGate(bridge)
         let handler = BridgeMessageHandler(bridge: gate, origin: origin)
         webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 400, height: 300),
@@ -248,6 +249,30 @@ struct WebBridgeRoundTripTests {
         #expect(try await page.run("return navigator.bluetooth.pigriderBridge.version") as? Int == 1)
         let devices = try await page.run("return (await navigator.bluetooth.getDevices()).length")
         #expect(devices as? Int == 0)
+    }
+
+    /// WebKit has no `navigator.clipboard` over plain HTTP: the polyfill's goes to the app's clipboard.
+    @Test func aHomeServerOverPlainHTTPCanCopyText() async throws {
+        let page = RoundTripPage(polyfill: try BridgePolyfill.bundled(), origin: "http://192.168.1.20:8080")
+        page.prompts.autoAnswer = true
+        try await page.load(baseURL: "http://192.168.1.20:8080/")
+        try await page.run("await navigator.clipboard.writeText('OpenRadlr device diagnostics')")
+        #expect(page.prompts.copied == ["OpenRadlr device diagnostics"])
+    }
+
+    /// The tap check in the polyfill is the page's own: posting to the app
+    /// directly still needs the rider's Copy in the native prompt.
+    @Test func aCopyPostedStraightToTheAppStillNeedsTheRidersOK() async throws {
+        let page = RoundTripPage(polyfill: try BridgePolyfill.bundled(), origin: "http://192.168.1.20:8080")
+        page.prompts.autoAnswer = false
+        try await page.load(baseURL: "http://192.168.1.20:8080/")
+        let reply = try await page.run("""
+            return await window.webkit.messageHandlers.ble.postMessage({ op: 'copyText', text: 'replacement' })
+            """)
+        let error = (reply as? [String: Any])?["error"] as? [String: Any]
+        #expect(error?["name"] as? String == "NotAllowedError")
+        #expect(page.prompts.asked == ["replacement"])
+        #expect(page.prompts.copied.isEmpty)
     }
 
     @Test func theHTTPTwinOfAnHTTPSServerGetsNoBluetooth() async throws {

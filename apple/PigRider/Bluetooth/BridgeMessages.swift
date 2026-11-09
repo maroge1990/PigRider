@@ -11,6 +11,7 @@ struct BridgeError: Error, Equatable, Sendable {
         case timeoutError = "TimeoutError"
         case abortError = "AbortError"
         case dataError = "DataError"
+        case notAllowedError = "NotAllowedError"
     }
 
     let name: Name
@@ -28,6 +29,8 @@ struct BridgeError: Error, Equatable, Sendable {
     static let gattDisconnected = BridgeError(.networkError, "GATT Server is disconnected.")
     static let timedOut = BridgeError(.networkError, "GATT operation timed out.")
     static let documentChanged = BridgeError(.abortError, "The page was reloaded.")
+    static let copyCancelled = BridgeError(.notAllowedError, "Copy cancelled.")
+    static let copyWaiting = BridgeError(.notAllowedError, "Another copy is waiting for confirmation.")
 }
 
 /// Web Bluetooth's `BluetoothCharacteristicProperties`, listed in its order.

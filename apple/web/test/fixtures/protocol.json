@@ -12,7 +12,8 @@
   "getCharacteristic",
   "startNotifications",
   "writeValue",
-  "reportUnsupported"
+  "reportUnsupported",
+  "copyText"
  ],
  "errorNames": [
   "NotFoundError",
@@ -22,7 +23,8 @@
   "InvalidStateError",
   "TimeoutError",
   "AbortError",
-  "DataError"
+  "DataError",
+  "NotAllowedError"
  ],
  "calls": [
   {
@@ -204,6 +206,14 @@
    "valid": true
   },
   {
+   "name": "copy text",
+   "message": {
+    "op": "copyText",
+    "text": "OpenRadlr device diagnostics\n[0.4s] INFO Selected controller \"Zwift Click\""
+   },
+   "valid": true
+  },
+  {
    "name": "unknown op",
    "message": {
     "op": "getAvailability"
@@ -375,6 +385,15 @@
     "op": "disconnect",
     "id": "5F1E0C2A-7B3D-4E59-9A61-2C8D4B7E9F10",
     "epoch": "3"
+   },
+   "valid": false,
+   "error": "DataError"
+  },
+  {
+   "name": "copy text that is not a string",
+   "message": {
+    "op": "copyText",
+    "text": 42
    },
    "valid": false,
    "error": "DataError"

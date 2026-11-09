@@ -43,8 +43,9 @@ export function fakeChannel() {
   };
 }
 
-export function install({ origin = ORIGIN, pageOrigin = origin, version = 1 } = {}) {
-  const target = { location: { origin: pageOrigin }, navigator: {} };
+/** `navigator`: the page's own navigator members (e.g. `clipboard` in a secure context, `userActivation`). */
+export function install({ origin = ORIGIN, pageOrigin = origin, version = 1, navigator = {} } = {}) {
+  const target = { location: { origin: pageOrigin }, navigator: { ...navigator } };
   const channel = fakeChannel();
   installPigriderBluetooth(target, { origin, version, channel: channel.post });
   return { target, channel, bluetooth: target.navigator.bluetooth, dispatch: (event) => target.__pigriderBle.dispatch(event) };

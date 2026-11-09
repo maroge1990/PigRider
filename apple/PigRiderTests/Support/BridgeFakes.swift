@@ -162,6 +162,33 @@ final class UnsupportedLog {
     var methods: [String] = []
 }
 
+/// The rider's Copy / Cancel prompt: records what was asked and answers when told
+/// (or at once, with `autoAnswer`). Copies only on Copy, as the app's prompt does.
+/// `cancel()` only counts: a prompt whose late answer the bridge must ignore.
+@MainActor
+final class CopyPrompts: CopyPrompting {
+    var asked: [String] = []
+    var copied: [String] = []
+    var cancels = 0
+    var autoAnswer: Bool?
+    private var waiting: [(text: String, done: @MainActor (Bool) -> Void)] = []
+
+    func ask(_ text: String, done: @escaping @MainActor (Bool) -> Void) {
+        asked.append(text)
+        waiting.append((text, done))
+        if let autoAnswer { answer(autoAnswer) }
+    }
+
+    func cancel() { cancels += 1 }
+
+    /// Answers the oldest prompt still waiting (`at`: a later one).
+    func answer(_ copy: Bool, at index: Int = 0) {
+        let prompt = waiting.remove(at: index)
+        if copy { copied.append(prompt.text) }
+        prompt.done(copy)
+    }
+}
+
 // The KICKR's GATT table used across the bridge tests.
 let ftms = uuid("1826")
 let cyclingPower = uuid("1818")
@@ -187,6 +214,7 @@ final class BridgeHarness {
     let scheduler = FakeScheduler()
     let store = InMemoryStore()
     let unsupported = UnsupportedLog()
+    let prompts = CopyPrompts()
     let grants: GrantStore
     let bridge: BluetoothBridge
     let kickr = FakePeripheral(id: kickrID, name: "KICKR CORE 1234")
@@ -198,8 +226,10 @@ final class BridgeHarness {
     init() {
         grants = GrantStore(store: store)
         let unsupported = self.unsupported
+        let prompts = self.prompts
         bridge = BluetoothBridge(central: central, grants: grants, events: sink, chooser: presenter,
-                                 scheduler: scheduler, onUnsupported: { unsupported.methods.append($0) })
+                                 scheduler: scheduler, onUnsupported: { unsupported.methods.append($0) },
+                                 copyPrompt: prompts)
         kickr.gatt = [
             (ftms, [
                 DiscoveredCharacteristic(uuid: controlPoint.characteristic, properties: [.write, .indicate]),

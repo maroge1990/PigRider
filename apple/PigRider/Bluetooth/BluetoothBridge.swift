@@ -4,7 +4,7 @@ import Foundation
 /// `apple/docs/bridge-protocol.md` on top of CoreBluetooth.
 ///
 /// API for the web view (T7):
-/// - `init(central:grants:events:chooser:scheduler:onUnsupported:)`. The bridge
+/// - `init(central:grants:events:chooser:scheduler:onUnsupported:copyPrompt:)`. The bridge
 ///   makes itself the central's delegate. `BluetoothBridge.live(...)` builds
 ///   one on CoreBluetooth.
 /// - `handle(_:origin:reply:)`: one call, decoded with `BridgeCall.decode`,
@@ -40,6 +40,11 @@ final class BluetoothBridge {
     private let chooserPresenter: any ChooserPresenting
     private let scheduler: any Scheduling
     private let onUnsupported: @MainActor (String) -> Void
+    /// Asks the rider (Copy / Cancel) before `copyText`; nil: every copy is refused.
+    private let copyPrompt: (any CopyPrompting)?
+    /// The prompt whose answer still counts; nil while none is open.
+    private var openCopy: Int?
+    private var copyCount = 0
     private let scan: ScanCoordinator
 
     private var nextReplyID = 0
@@ -53,13 +58,15 @@ final class BluetoothBridge {
     private var connectedBeforeBackground: [(id: UUID, epoch: Int)] = []
 
     init(central: any CentralManaging, grants: GrantStore, events: any EventSink, chooser: any ChooserPresenting,
-         scheduler: any Scheduling = TaskScheduler(), onUnsupported: @escaping @MainActor (String) -> Void = { _ in }) {
+         scheduler: any Scheduling = TaskScheduler(), onUnsupported: @escaping @MainActor (String) -> Void = { _ in },
+         copyPrompt: (any CopyPrompting)? = nil) {
         self.central = central
         self.grants = grants
         self.events = events
         self.chooserPresenter = chooser
         self.scheduler = scheduler
         self.onUnsupported = onUnsupported
+        self.copyPrompt = copyPrompt
         scan = ScanCoordinator(scanner: central)
         central.delegate = self
     }
@@ -113,6 +120,19 @@ final class BluetoothBridge {
         case .reportUnsupported(let method):
             onUnsupported(method)
             reply.succeed()
+        case .copyText(let text):
+            // The page can't prove a tap to the app, so the rider confirms each copy, one prompt at a time.
+            guard let copyPrompt else { return reply.fail(.copyCancelled) }
+            guard openCopy == nil else { return reply.fail(.copyWaiting) }
+            copyCount += 1
+            let copy = copyCount
+            openCopy = copy
+            copyPrompt.ask(text) { [weak self] copied in
+                // A prompt from before a reload may answer late: its reply is gone, and it frees nothing.
+                guard let self, openCopy == copy else { return }
+                openCopy = nil
+                if copied { reply.succeed() } else { reply.fail(.copyCancelled) }
+            }
         }
     }
 
@@ -130,6 +150,10 @@ final class BluetoothBridge {
             chooserPresenter.dismiss(session.chooser)
         }
         connectedBeforeBackground = []
+        if openCopy != nil {
+            openCopy = nil
+            copyPrompt?.cancel()
+        }
     }
 
     func serverDidChange() {
