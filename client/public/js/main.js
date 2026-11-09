@@ -23,7 +23,7 @@ import { RidePause } from "./ride/ridePause.js";
 import { AfkPrompt } from "./ride/afkPrompt.js";
 import { defaultServerUrl } from "./net/protocol.js";
 import { StravaClient, activityUrl, stravaMessage } from "./net/strava.js";
-import { IntervalsClient, intervalsActivityUrl, offersIntervalsUpload } from "./net/intervals.js";
+import { IntervalsClient, intervalsActivityUrl, offersIntervalsUpload, uploadFinishedRide } from "./net/intervals.js";
 import { levelAfterRace, levelAfterRide, levelLabel, levelOf } from "./profile/level.js";
 import { eventBanner, groupGapLine, eventResultRows, eventRideName, eventRows, renderEventList, sharingLine } from "./view/events.js";
 import { ProfileStore, keepValid, validateProfile } from "./profile/profileStore.js";
@@ -2603,29 +2603,39 @@ function uploadToStrava() {
   return uploadRide(app.recorder, rideName(), { indoor: Boolean(app.studio), splits: app.finishSplits, button: $("upload-strava"), status: $("upload-status"), onSaved: rideKept });
 }
 
-/** Sends the finished ride to the server's intervals.icu account as FIT. */
-async function uploadToIntervals() {
+/**
+ * Sends the finished ride to the server's intervals.icu account as FIT. The
+ * answer belongs to this ride's recorder: once the rider is on another ride,
+ * it neither marks that ride kept nor writes to the finish screen.
+ */
+function uploadToIntervals() {
   if (!hasRealPowerSource(app.trainer)) return;
+  const recorder = app.recorder;
   const button = $("upload-intervals");
   const status = $("intervals-status");
-  button.disabled = true;
-  status.textContent = t("intervals.uploading");
-  try {
-    const fit = app.recorder.toFit({ indoor: Boolean(app.studio), splits: app.finishSplits });
-    const { activity_id: id } = await app.intervals.upload(fit, rideName());
-    rideKept();
-    if (id) {
-      status.replaceChildren(
-        t("intervals.done"),
-        Object.assign(document.createElement("a"), { href: intervalsActivityUrl(id), target: "_blank", rel: "noopener", textContent: t("intervals.view") }),
-      );
-    } else {
-      status.textContent = t("intervals.uploaded");
-    }
-  } catch (error) {
-    status.textContent = t("intervals.uploadFailed", { message: error.message });
-    button.disabled = false;
-  }
+  return uploadFinishedRide({
+    client: app.intervals,
+    fit: recorder.toFit({ indoor: Boolean(app.studio), splits: app.finishSplits }),
+    name: rideName(),
+    stillCurrent: () => app.recorder === recorder,
+    kept: rideKept,
+    report: ({ step, id, message }) => {
+      if (step === "uploading") {
+        button.disabled = true;
+        status.textContent = t("intervals.uploading");
+      } else if (step === "failed") {
+        status.textContent = t("intervals.uploadFailed", { message });
+        button.disabled = false;
+      } else if (id) {
+        status.replaceChildren(
+          t("intervals.done"),
+          Object.assign(document.createElement("a"), { href: intervalsActivityUrl(id), target: "_blank", rel: "noopener", textContent: t("intervals.view") }),
+        );
+      } else {
+        status.textContent = t("intervals.uploaded");
+      }
+    },
+  });
 }
 
 /**

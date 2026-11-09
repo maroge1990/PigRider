@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { IntervalsClient, intervalsActivityUrl, offersIntervalsUpload } from "../public/js/net/intervals.js";
+import { IntervalsClient, intervalsActivityUrl, offersIntervalsUpload, uploadFinishedRide } from "../public/js/net/intervals.js";
 
 const reply = (status, body) => ({ ok: status < 400, status, json: async () => body });
 
@@ -48,4 +48,60 @@ test("the upload is offered for trainer rides on a server with intervals.icu", (
   // Older servers have no `intervals` in /api/info.
   assert.equal(offersIntervalsUpload({}, true), false);
   assert.equal(offersIntervalsUpload(null, true), false);
+});
+
+/** An upload that answers when the test says so. */
+function pendingUpload() {
+  let settle;
+  const answer = new Promise((resolve, reject) => { settle = { resolve, reject }; });
+  return { client: { upload: () => answer }, settle };
+}
+
+function ride(client) {
+  const steps = [];
+  let kept = 0;
+  const state = { current: true };
+  const done = uploadFinishedRide({
+    client, fit: new Uint8Array([1]), name: "Ride",
+    stillCurrent: () => state.current, kept: () => { kept += 1; }, report: (step) => steps.push(step),
+  });
+  return { steps, kept: () => kept, state, done };
+}
+
+test("a finished upload keeps the ride and reports the activity", async () => {
+  const { client, settle } = pendingUpload();
+  const upload = ride(client);
+  assert.deepEqual(upload.steps, [{ step: "uploading" }]);
+  settle.resolve({ activity_id: "i42" });
+  await upload.done;
+  assert.equal(upload.kept(), 1);
+  assert.deepEqual(upload.steps.at(-1), { step: "done", id: "i42" });
+});
+
+test("a failed upload reports why and keeps nothing", async () => {
+  const { client, settle } = pendingUpload();
+  const upload = ride(client);
+  settle.reject(new Error("intervals.icu is busy"));
+  await upload.done;
+  assert.equal(upload.kept(), 0);
+  assert.deepEqual(upload.steps.at(-1), { step: "failed", message: "intervals.icu is busy" });
+});
+
+test("an upload that finishes after the next ride started leaves that ride alone", async () => {
+  const { client, settle } = pendingUpload();
+  const upload = ride(client);
+  upload.state.current = false; // back to the menu, next ride started
+  settle.resolve({ activity_id: "i42" });
+  await upload.done;
+  assert.equal(upload.kept(), 0);
+  assert.deepEqual(upload.steps, [{ step: "uploading" }]);
+});
+
+test("a late failure is not shown on the next ride either", async () => {
+  const { client, settle } = pendingUpload();
+  const upload = ride(client);
+  upload.state.current = false;
+  settle.reject(new Error("timeout"));
+  await upload.done;
+  assert.deepEqual(upload.steps, [{ step: "uploading" }]);
 });

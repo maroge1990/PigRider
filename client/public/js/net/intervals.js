@@ -28,3 +28,22 @@ export class IntervalsClient {
     return body;
   }
 }
+
+/**
+ * Uploads a finished ride and reports how it went with `report(state)`:
+ * `{step: "uploading"}`, then `{step: "done", id}` (id may be null) or
+ * `{step: "failed", message}`. The rider may have started another ride by
+ * the time intervals.icu answers, so the answer counts only while
+ * `stillCurrent()`: then a success calls `kept()`; otherwise it is dropped.
+ */
+export async function uploadFinishedRide({ client, fit, name, stillCurrent, kept, report }) {
+  report({ step: "uploading" });
+  try {
+    const { activity_id: id = null } = await client.upload(fit, name);
+    if (!stillCurrent()) return;
+    kept();
+    report({ step: "done", id });
+  } catch (error) {
+    if (stillCurrent()) report({ step: "failed", message: error.message });
+  }
+}
