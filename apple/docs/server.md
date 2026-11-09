@@ -40,8 +40,24 @@ Then Unraid → Docker → *Add Container* → template *PigRider* → *Apply*.
 The GHCR package must be public (GitHub → Packages → pigrider → settings), as
 PigTV's is, or Unraid needs a registry login.
 
-## Later
+## Uploads to Strava and intervals.icu
 
-- Strava (P2): fill in *Secret key* in the container settings (`openssl rand
-  -hex 32`, in Unraid only, never in the repo) and the Strava client id and
-  secret variables then added to the template.
+The finish screen offers *Upload to Strava* and *Upload to intervals.icu*
+once these are set. Secrets go in the Unraid container settings only, never in
+the repo. After changing them: *Apply*, which restarts the container.
+
+1. **Strava.** Create an API app at <https://www.strava.com/settings/api>
+   with *Authorization Callback Domain* `192.168.1.235` (the host of *Public
+   URL*). Copy its client ID and client secret into *Strava client ID* and
+   *Strava client secret*, and set *Secret key* (`openssl rand -hex 32`) so the
+   login survives updates. On the iPad: start menu → *Connect with Strava*,
+   keep "upload activities" ticked, and sign in with email and password ("Sign
+   in with Apple/Google" leaves the app for Safari).
+2. **intervals.icu.** intervals.icu → *Settings* → *Developer Settings* →
+   API key, into *intervals.icu API key*. Every ride uploaded from this server
+   goes to that account, so it suits a server only Mark rides on. The upload
+   is accepted only from the page at *Public URL*: keep that exact.
+
+If the template on passyflix predates these fields, copy the new
+`my-PigRider.xml` over it first (see *First install*) and *Apply*; existing
+values are kept.
