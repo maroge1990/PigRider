@@ -4,12 +4,15 @@
 //! lookup as a function. Production passes `std::env::var`, tests pass a map.
 
 use crate::guard::ConnectionLimits;
+use crate::intervals::{ApiKey, IntervalsConfig};
+use crate::obn::link::Heartbeat;
 use crate::strava::StravaConfig;
 use openradlr_sim::SimConfig;
 use std::fmt;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuthMode {
@@ -78,6 +81,8 @@ pub struct Config {
     pub public_url: Option<String>,
     /// "Connect with Strava", if a Strava API app is configured.
     pub strava: Option<StravaConfig>,
+    /// Uploads to intervals.icu with the operator's API key (`OPENRADLR_INTERVALS_API_KEY`).
+    pub intervals: Option<IntervalsConfig>,
     /// Where Strava logins are kept so they survive restarts (`OPENRADLR_DATA_DIR`, with the key).
     pub data_dir: Option<std::path::PathBuf>,
     /// Encrypts the stored Strava refresh tokens (`OPENRADLR_SECRET_KEY`).
@@ -101,6 +106,13 @@ pub struct Config {
     pub analytics: Option<Analytics>,
     /// The operator's privacy policy, linked from the start menu (`OPENRADLR_PRIVACY_URL`).
     pub privacy_url: Option<String>,
+    /// The OpenBikeNet server to share the velodrome with (`OPENRADLR_OBN_URL`); `None` = not connected.
+    pub obn_url: Option<String>,
+    /// Base of the reconnect delay to OpenBikeNet (no environment variable; for tests).
+    pub obn_backoff_unit: Duration,
+    /// When a quiet OpenBikeNet server is pinged and given up on (no environment variable;
+    /// the spec's 20 s and 10 s, shorter in tests).
+    pub obn_heartbeat: Heartbeat,
 }
 
 /// A Plausible-compatible analytics script the client loads on request of the operator.
@@ -300,6 +312,24 @@ impl Config {
                 })
             }
         };
+        // One key for the whole server: meant for a private server with one rider.
+        let intervals = match reader.raw("OPENRADLR_INTERVALS_API_KEY").filter(|v| !v.is_empty()) {
+            None => None,
+            Some(key) => {
+                let Some(url) = &public_url else {
+                    return Err(ConfigError {
+                        key: "OPENRADLR_INTERVALS_API_KEY",
+                        value: "(hidden)".into(),
+                        reason: "needs OPENRADLR_PUBLIC_URL (uploads are accepted from that page only)".into(),
+                    });
+                };
+                Some(IntervalsConfig {
+                    api_key: ApiKey::new(key),
+                    base_url: crate::intervals::DEFAULT_BASE_URL.into(),
+                    public_url: url.clone(),
+                })
+            }
+        };
         let data_dir = reader
             .raw("OPENRADLR_DATA_DIR")
             .filter(|v| !v.is_empty())
@@ -386,6 +416,16 @@ impl Config {
             )?;
         }
 
+        let obn_url = reader.raw("OPENRADLR_OBN_URL").filter(|url| !url.is_empty());
+        if let Some(url) = &obn_url {
+            reader.check(
+                "OPENRADLR_OBN_URL",
+                url,
+                url.starts_with("ws://") || url.starts_with("wss://"),
+                "must be a ws:// or wss:// URL",
+            )?;
+        }
+
         Ok(Self {
             bind_addr: reader.parse("OPENRADLR_BIND", SocketAddr::from(([0, 0, 0, 0], 8080)))?,
             route_file: reader
@@ -420,6 +460,7 @@ impl Config {
             allowed_origins,
             public_url,
             strava,
+            intervals,
             data_dir,
             secret_key,
             stats_file,
@@ -431,6 +472,9 @@ impl Config {
             event_lobby_s,
             analytics,
             privacy_url,
+            obn_url,
+            obn_backoff_unit: Duration::from_secs(1),
+            obn_heartbeat: Heartbeat::default(),
         })
     }
 
@@ -661,6 +705,16 @@ mod tests {
     }
 
     #[test]
+    fn obn_url_must_be_websocket() {
+        assert_eq!(config(&[]).unwrap().obn_url, None);
+        assert_eq!(config(&[("OPENRADLR_OBN_URL", "")]).unwrap().obn_url, None);
+        let c = config(&[("OPENRADLR_OBN_URL", "wss://obn.example/v0")]).unwrap();
+        assert_eq!(c.obn_url.as_deref(), Some("wss://obn.example/v0"));
+        let err = config(&[("OPENRADLR_OBN_URL", "https://x")]).unwrap_err();
+        assert_eq!(err.key, "OPENRADLR_OBN_URL");
+    }
+
+    #[test]
     fn analytics_is_off_unless_a_domain_is_set() {
         assert_eq!(config(&[]).unwrap().analytics, None);
         assert_eq!(config(&[("OPENRADLR_ANALYTICS_DOMAIN", "")]).unwrap().analytics, None);
@@ -734,6 +788,27 @@ mod tests {
             config(&[("OPENRADLR_MAX_CONNECTIONS_PER_IP", "0")]).unwrap_err().key,
             "OPENRADLR_MAX_CONNECTIONS_PER_IP"
         );
+    }
+
+    #[test]
+    fn an_intervals_key_uploads_for_the_public_url() {
+        assert_eq!(config(&[]).unwrap().intervals, None);
+        let c = config(&[
+            ("OPENRADLR_INTERVALS_API_KEY", "s3cret-key"),
+            ("OPENRADLR_PUBLIC_URL", "http://192.168.1.235:8080/"),
+        ])
+        .unwrap();
+        let intervals = c.intervals.clone().unwrap();
+        assert_eq!(intervals.public_url, "http://192.168.1.235:8080");
+        assert_eq!(intervals.base_url, "https://intervals.icu");
+        assert!(!format!("{c:?}").contains("s3cret-key"));
+    }
+
+    #[test]
+    fn an_intervals_key_needs_the_public_url_and_stays_hidden() {
+        let error = config(&[("OPENRADLR_INTERVALS_API_KEY", "s3cret-key")]).unwrap_err();
+        assert_eq!(error.key, "OPENRADLR_INTERVALS_API_KEY");
+        assert!(!error.to_string().contains("s3cret-key"));
     }
 
     #[test]

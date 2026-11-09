@@ -23,6 +23,7 @@ import { RidePause } from "./ride/ridePause.js";
 import { AfkPrompt } from "./ride/afkPrompt.js";
 import { defaultServerUrl } from "./net/protocol.js";
 import { StravaClient, activityUrl, stravaMessage } from "./net/strava.js";
+import { IntervalsClient, intervalsActivityUrl, offersIntervalsUpload, uploadFinishedRide } from "./net/intervals.js";
 import { levelAfterRace, levelAfterRide, levelLabel, levelOf } from "./profile/level.js";
 import { eventBanner, groupGapLine, eventResultRows, eventRideName, eventRows, renderEventList, sharingLine } from "./view/events.js";
 import { ProfileStore, keepValid, validateProfile } from "./profile/profileStore.js";
@@ -78,7 +79,7 @@ import { drawRaceTimeline } from "./view/raceTimelineView.js";
 import { drawMapPreview } from "./view/mapPreview.js";
 import { MenuStage } from "./view/menuStage.js";
 import { BUILD } from "./build.js";
-import { buildLabel, communityDistance, pickRoute, renderRoutes, routesOf, serverStatus, stageHeadline, stageLede, stageStats, workoutRoute, devicesVisible, privacyUrl, serverName, joinAction, stravaLine, activityOf, activityTabs, pickForActivity, renderActivityTabs, routesFor, shownActivity, showsCards } from "./view/startMenu.js";
+import { buildLabel, communityDistance, pickRoute, renderRoutes, routesOf, serverStatus, stageHeadline, stageLede, stageStats, workoutRoute, devicesVisible, privacyUrl, serverName, joinAction, stravaLine, activityOf, activityTabs, pickForActivity, renderActivityTabs, routesFor, shownActivity, showsCards, sharedNote } from "./view/startMenu.js";
 import { PRESETS } from "./workout/presets.js";
 import { renderWorkoutCards } from "./view/workoutCards.js";
 import { WorkoutSession } from "./workout/workoutSession.js";
@@ -392,6 +393,7 @@ const app = {
   rideMode: readSetting(RIDE_MODE_KEY),
   infoTimer: null,
   strava: new StravaClient(),
+  intervals: new IntervalsClient(),
   wakeLock: new ScreenWakeLock(),
   /** undefined = not checked yet, null = not connected. */
   stravaAccount: undefined,
@@ -792,6 +794,8 @@ function initMenuStage() {
   const drawStage = () => {
     const { route, routes } = shown;
     $("menu-profile").hidden = !route;
+    // Docked in the corner, the map points at the picked route; with none (Workout, Studio) it is an empty box.
+    $("menu-map").hidden = !route && $("setup").classList.contains("map-docked");
     drawMapPreview($("menu-map"), { routes, selectedId: route?.id ?? null, network: shown.network ?? null });
     if (route) drawProfile($("menu-profile"), { route, riders: [], myId: null, colors: themeColors() });
   };
@@ -856,10 +860,10 @@ function stageOffset(stage) {
   return [clamp(((rect.left + rect.width / 2) / window.innerWidth) * 2 - 1), clamp(1 - ((rect.top + rect.height / 2) / window.innerHeight) * 2)];
 }
 
-/** Ends the menu; keeps its 3D view for the ride if it shows `routeId`. */
-function closeMenuStage(routeId) {
+/** Ends the menu; keeps its 3D view for the ride if it shows `routeId` or a route of `map`. */
+function closeMenuStage(routeId, map = null) {
   if (!app.menu) return;
-  app.menuView = app.menu.takeView(routeId);
+  app.menuView = app.menu.takeView(routeId, map);
   app.menu = null;
   clearTimeout(app.mapDockTimer);
   $("setup").classList.remove("world-ready", "map-docked", "world-building");
@@ -942,6 +946,9 @@ function renderStartMenu() {
     renderStartMenu();
   });
   $("stage-stats").textContent = activity === "events" ? "" : stageStats(selected);
+  const shared = sharedNote(selected);
+  $("shared-note").hidden = !shared;
+  $("shared-note").textContent = shared;
   const cards = routesFor(activity, routes);
   $("route-list").hidden = !showsCards(activity, cards);
   renderRoutes($("route-list"), cards, selected?.id ?? null, (id) => {
@@ -1591,7 +1598,8 @@ async function joinRide(restored = null) {
     resumeToken: restored?.snapshot.resumeToken,
     resume: restored && route?.kind !== "studio" ? restored.snapshot.resumePoint : null,
   });
-  closeMenuStage(route?.kind === "studio" ? null : route?.id);
+  const studio = route?.kind === "studio";
+  closeMenuStage(studio ? null : route?.id, studio ? null : (app.routeFile.map?.id ?? null));
   if (app.pendingEventId) {
     connection.joinEvent(app.pendingEventId);
     app.pendingEventId = null;
@@ -1659,7 +1667,7 @@ async function joinWorkout(profile, errors) {
   wireConnection(connection);
   app.connection = connection;
   app.riderId = await connection.join({ ...app.profile, routeId, level: levelOf(app.profile), device: "workout" });
-  closeMenuStage(routeId);
+  closeMenuStage(routeId, app.routeFile.map?.id ?? null);
   app.workoutPlan = plan;
   app.workout = new WorkoutSession({ plan, now, wallNow: () => Date.now() });
   startRide();
@@ -2452,6 +2460,7 @@ function initFinish() {
     rideKept();
   });
   $("upload-strava").addEventListener("click", () => uploadToStrava());
+  $("upload-intervals").addEventListener("click", () => uploadToIntervals());
 }
 
 const rideName = () => (app.eventRide ? eventRideName(app.eventRide.kind, app.eventRide.routeName) : `OpenRadlr · ${app.rideRoute.name}`);
@@ -2569,6 +2578,9 @@ function openFinish() {
   const canUpload = measured && Boolean(app.stravaAccount?.can_upload);
   $("upload-strava").hidden = !canUpload;
   $("upload-strava").disabled = empty;
+  $("upload-intervals").hidden = !offersIntervalsUpload(app.info, measured);
+  $("upload-intervals").disabled = empty;
+  $("intervals-status").textContent = "";
   $("upload-status").textContent = empty
     ? t("finish.note.tooShort")
     : !exportable
@@ -2589,6 +2601,41 @@ function openFinish() {
 function uploadToStrava() {
   if (!hasRealPowerSource(app.trainer)) return;
   return uploadRide(app.recorder, rideName(), { indoor: Boolean(app.studio), splits: app.finishSplits, button: $("upload-strava"), status: $("upload-status"), onSaved: rideKept });
+}
+
+/**
+ * Sends the finished ride to the server's intervals.icu account as FIT. The
+ * answer belongs to this ride's recorder: once the rider is on another ride,
+ * it neither marks that ride kept nor writes to the finish screen.
+ */
+function uploadToIntervals() {
+  if (!hasRealPowerSource(app.trainer)) return;
+  const recorder = app.recorder;
+  const button = $("upload-intervals");
+  const status = $("intervals-status");
+  return uploadFinishedRide({
+    client: app.intervals,
+    fit: recorder.toFit({ indoor: Boolean(app.studio), splits: app.finishSplits }),
+    name: rideName(),
+    stillCurrent: () => app.recorder === recorder,
+    kept: rideKept,
+    report: ({ step, id, message }) => {
+      if (step === "uploading") {
+        button.disabled = true;
+        status.textContent = t("intervals.uploading");
+      } else if (step === "failed") {
+        status.textContent = t("intervals.uploadFailed", { message });
+        button.disabled = false;
+      } else if (id) {
+        status.replaceChildren(
+          t("intervals.done"),
+          Object.assign(document.createElement("a"), { href: intervalsActivityUrl(id), target: "_blank", rel: "noopener", textContent: t("intervals.view") }),
+        );
+      } else {
+        status.textContent = t("intervals.uploaded");
+      }
+    },
+  });
 }
 
 /**
@@ -3684,6 +3731,11 @@ function initViews() {
   // Building the world (with the other routes on its map) takes a moment,
   // off the main thread where possible; ride in 2D meanwhile. A season changed
   // meanwhile is picked up when this build lands.
+  if (app.workout) {
+    // A workout has no 2D view: say what the empty screen is waiting for.
+    $("workout-note").textContent = t("workout.buildingGym");
+    $("workout-note").hidden = false;
+  }
   buildRideWorld();
 }
 
@@ -3719,6 +3771,7 @@ function show3d(scene, view = null) {
   app.view3d.network = app.network;
   if (app.view3d.route !== app.route) app.view3d.setRoute(app.route);
   $("view-note").textContent = "";
+  if ($("workout-note").textContent === t("workout.buildingGym")) $("workout-note").hidden = true;
   $("view-3d").disabled = false;
   const camera = readSetting(CAMERA_KEY);
   if (CAMERA_MODES[camera]) app.view3d.setCameraMode(camera);

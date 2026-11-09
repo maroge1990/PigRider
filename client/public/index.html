@@ -66,6 +66,7 @@
               <header class="stage-head">
                 <h1 id="routes-title" data-i18n="menu.routes.title">Where do you want to ride?</h1>
                 <p id="stage-stats" class="stage-stats"></p>
+                <p id="shared-note" class="lede shared-note" hidden></p>
                 <p id="routes-lede" class="lede" data-i18n="menu.stage.rideLede">Everyone on the same route rides together — friends, strangers and bots.</p>
               </header>
               <!-- The window the drone camera looks through (and the map until the island is ready). -->
@@ -775,11 +776,13 @@
             </section>
             <div class="modal-actions">
               <button type="button" id="upload-strava" class="strava-button" hidden data-i18n="unfinished.uploadStrava">Upload to Strava</button>
+              <button type="button" id="upload-intervals" class="secondary" hidden data-i18n="intervals.upload">Upload to intervals.icu</button>
               <button type="button" id="download-tcx" class="secondary" data-i18n="ride.downloadTcx">Download .tcx</button>
               <button type="button" id="download-gpx" class="secondary" data-i18n="ride.downloadGpx">Download .gpx</button>
               <button type="button" id="download-fit" class="secondary" data-i18n="ride.downloadFit">Download .fit</button>
             </div>
             <p id="upload-status" class="field-hint" aria-live="polite"></p>
+            <p id="intervals-status" class="field-hint" aria-live="polite"></p>
 
             <section class="photos" aria-labelledby="photos-title">
               <h3 id="photos-title"><span data-i18n="photos.title">Photos</span> <span id="photos-count" class="muted"></span></h3>
