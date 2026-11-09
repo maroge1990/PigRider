@@ -21,6 +21,10 @@ Strava and intervals.icu.
 ## Building
 - The Mac is reachable as `ssh mac` (Apple Silicon, Xcode 27, iOS 27 simulators,
   paid developer account). It has no node or cargo; JS and Rust run here.
+- The app supports **iPadOS 17 and later** (Mark's call). Use only iOS 17 APIs
+  natively (the compiler checks), and nothing in the web client or the polyfill
+  that iPadOS 17's WebKit (Safari 17) lacks: the compiler cannot check that, and
+  the Mac only has iOS 27 simulators.
 - iOS builds and tests run on the Mac with `xcodebuild` (script added in P1).
 - The server runs on `passyflix` as an Unraid container (`PigRider`, image from GHCR),
   over plain HTTP on the home network only (ADR 0001): [docs/server.md](docs/server.md).
