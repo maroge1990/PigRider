@@ -12,21 +12,56 @@ final class ShellStatus {
     var loadFailure: String?
 }
 
-/// The rider's Copy / Cancel prompt for the page's `navigator.clipboard.writeText`
-/// over plain HTTP: the page can't prove a tap to the app, so the rider confirms.
+/// What the bridge needs to ask the rider before a copy. `ask` answers exactly
+/// once (true: copied); `cancel` closes an open prompt, which then answers false.
 @MainActor
-final class CopyPrompt {
+protocol CopyPrompting: AnyObject {
+    func ask(_ text: String, done: @escaping @MainActor (Bool) -> Void)
+    func cancel()
+}
+
+/// The rider's Copy / Cancel alert for the page's `navigator.clipboard.writeText`
+/// over plain HTTP: the page can't prove a tap to the app, so the rider confirms.
+/// However the alert ends (a button, `cancel()`, or vanishing with the view it sat
+/// on), it answers once; one that UIKit won't show answers false at once.
+@MainActor
+final class CopyPrompt: CopyPrompting {
     var presenter: @MainActor () -> UIViewController? = { nil }
+    var copy: @MainActor (String) -> Void = { UIPasteboard.general.string = $0 }
+    var animates = true
+    private var open: (alert: UIAlertController, text: String, done: @MainActor (Bool) -> Void)?
 
     func ask(_ text: String, done: @escaping @MainActor (Bool) -> Void) {
+        cancel()
         guard let presenter = presenter() else { return done(false) }
-        let alert = UIAlertController(title: "Copy to the clipboard?", message: Self.preview(text), preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in done(false) })
-        alert.addAction(UIAlertAction(title: "Copy", style: .default) { _ in
-            UIPasteboard.general.string = text
-            done(true)
-        })
-        presenter.present(alert, animated: true)
+        let alert = CopyAlert(title: "Copy to the clipboard?", message: Self.preview(text), preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { [weak self] _ in self?.choose(copy: false) })
+        alert.addAction(UIAlertAction(title: "Copy", style: .default) { [weak self] _ in self?.choose(copy: true) })
+        // An action's handler runs after the alert has disappeared: a turn later, an answer is already in.
+        alert.onDisappear = { [weak self, weak alert] in
+            DispatchQueue.main.async { if let alert { self?.finish(alert, copied: false) } }
+        }
+        open = (alert, text, done)
+        presenter.present(alert, animated: animates)
+        if alert.presentingViewController == nil { finish(alert, copied: false) }
+    }
+
+    func cancel() {
+        guard let alert = open?.alert else { return }
+        finish(alert, copied: false)
+        alert.presentingViewController?.dismiss(animated: false)
+    }
+
+    /// What the alert's buttons do.
+    func choose(copy: Bool) {
+        if let alert = open?.alert { finish(alert, copied: copy) }
+    }
+
+    private func finish(_ alert: UIAlertController, copied: Bool) {
+        guard let open, open.alert === alert else { return }
+        self.open = nil
+        if copied { copy(open.text) }
+        open.done(copied)
     }
 
     /// The first line (up to 80 characters) and how many more follow, so the rider sees what is copied.
@@ -39,6 +74,15 @@ final class CopyPrompt {
         case 1: return "“\(shown)” and 1 more line"
         case let more: return "“\(shown)” and \(more) more lines"
         }
+    }
+}
+
+private final class CopyAlert: UIAlertController {
+    var onDisappear: (@MainActor () -> Void)?
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        onDisappear?()
     }
 }
 
@@ -65,7 +109,7 @@ final class WebShell: NSObject {
         let copyPrompt = CopyPrompt()
         bridge = BluetoothBridge.live(grants: grants, events: sink, chooser: chooser,
                                       onUnsupported: { [weak status] in status?.unsupportedMember = $0 },
-                                      copyText: { copyPrompt.ask($0, done: $1) })
+                                      copyPrompt: copyPrompt)
         handler = BridgeMessageHandler(bridge: bridge, origin: nil)
         let configuration = BridgeWebConfiguration.make(polyfill: polyfill, origin: nil, handler: handler)
         contentController = configuration.userContentController

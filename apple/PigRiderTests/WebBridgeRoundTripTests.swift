@@ -80,9 +80,8 @@ final class RoundTripPage: NSObject, WKNavigationDelegate {
     init(polyfill: BridgePolyfill, origin: String = RoundTripPage.origin) {
         self.origin = origin
         let sink = PageEventSink()
-        let prompts = self.prompts
         bridge = BluetoothBridge(central: central, grants: GrantStore(store: InMemoryStore()), events: sink,
-                                 chooser: presenter, scheduler: FakeScheduler(), copyText: { prompts.ask($0, $1) })
+                                 chooser: presenter, scheduler: FakeScheduler(), copyPrompt: prompts)
         gate = ReplyGate(bridge)
         let handler = BridgeMessageHandler(bridge: gate, origin: origin)
         webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 400, height: 300),

@@ -40,6 +40,29 @@ struct ClipboardTests {
         #expect(third.single == .success(.none))
     }
 
+    /// A reload ends the document, and the prompt with it (it may also vanish with
+    /// the chooser it sat on): the next page can copy again.
+    @Test func aReloadCancelsTheOpenPromptAndCopyingWorksAgain() {
+        let stale = h.call(.copyText(text: report))
+        h.bridge.documentDidChange()
+        #expect(h.prompts.cancels == 1)
+        #expect(stale.errorName == .abortError)
+        let fresh = h.call(.copyText(text: report))
+        #expect(h.prompts.asked.count == 2)
+        h.prompts.answer(true)  // the old prompt answering late changes nothing
+        #expect(fresh.all.isEmpty)
+        #expect(stale.all.count == 1)
+        h.prompts.answer(true)
+        #expect(fresh.single == .success(.none))
+        #expect(h.call(.copyText(text: report)).all.isEmpty)  // asked again, not refused
+        #expect(h.prompts.asked.count == 3)
+    }
+
+    @Test func aReloadWithNoPromptOpenCancelsNothing() {
+        h.bridge.documentDidChange()
+        #expect(h.prompts.cancels == 0)
+    }
+
     @Test func thePromptShowsTheFirstLineAndHowManyFollow() {
         #expect(CopyPrompt.preview("OpenRadlr device diagnostics\nBuild: 1\nUser agent: x") ==
                 "“OpenRadlr device diagnostics” and 2 more lines")
