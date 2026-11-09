@@ -28,13 +28,23 @@ or oversized arguments. UUIDs are lowercase 128-bit strings; bytes are base64.
 | `startNotifications` | `id`, `service`, `characteristic` | `null` |
 | `writeValue` | `id`, `service`, `characteristic`, `value`, `withResponse` | `null` |
 | `reportUnsupported` | `method` | `null` (native shows a banner) |
+| `copyText` | `text` | `null` once the text is on the iPad's clipboard |
 
 Filters are as in Web Bluetooth after normalisation: `{services?, name?,
 namePrefix?, manufacturerData?: [{companyIdentifier}]}`.
 
 Limits enforced by Swift: `id` is a granted peripheral of the calling origin;
 `service` is in that grant; `value` ≤ 512 bytes; at most 8 filters and 16
-services per request; strings ≤ 248 bytes.
+services per request; strings ≤ 248 bytes, except `copyText`'s `text`
+(≤ 1 MiB).
+
+`copyText` is not Bluetooth. WebKit has no `navigator.clipboard` outside a
+secure context, so over plain HTTP at home (ADR 0001) the polyfill installs
+one whose `writeText(data)` sends `String(data)` here. It rejects with
+`NotAllowedError` and sends nothing unless `navigator.userActivation.isActive`
+(a tap), as browsers do. A page that has its own clipboard (HTTPS) keeps it.
+The addition is backwards compatible: the server's page uses only the standard
+API, so the bridge version stays 1.
 
 ## Events (Swift → JS)
 

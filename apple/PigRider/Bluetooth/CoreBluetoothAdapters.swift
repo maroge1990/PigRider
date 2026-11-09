@@ -13,9 +13,10 @@ import Foundation
 extension BluetoothBridge {
     /// A bridge on CoreBluetooth, for the app.
     static func live(grants: GrantStore, events: any EventSink, chooser: any ChooserPresenting,
-                     onUnsupported: @escaping @MainActor (String) -> Void) -> BluetoothBridge {
+                     onUnsupported: @escaping @MainActor (String) -> Void,
+                     copyText: @escaping @MainActor (String) -> Void) -> BluetoothBridge {
         BluetoothBridge(central: CoreBluetoothCentral(), grants: grants, events: events, chooser: chooser,
-                        scheduler: TaskScheduler(), onUnsupported: onUnsupported)
+                        scheduler: TaskScheduler(), onUnsupported: onUnsupported, copyText: copyText)
     }
 }
 

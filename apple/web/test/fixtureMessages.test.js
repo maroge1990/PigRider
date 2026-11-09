@@ -95,6 +95,12 @@ const SCENARIOS = {
     await (await characteristic(page, ZWIFT_SERVICE, ZWIFT_SYNC_RX)).writeValueWithoutResponse(new TextEncoder().encode("RideOn"));
     return page;
   },
+  "copy text": async () => {
+    const page = install({ navigator: { userActivation: { isActive: true } } });
+    page.channel.answer("copyText");
+    await page.target.navigator.clipboard.writeText('OpenRadlr device diagnostics\n[0.4s] INFO Selected controller "Zwift Click"');
+    return page;
+  },
   "report an unsupported member": async () => {
     const page = await withDevice();
     void page.bluetooth.getAvailability;

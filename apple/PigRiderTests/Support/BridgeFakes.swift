@@ -162,6 +162,11 @@ final class UnsupportedLog {
     var methods: [String] = []
 }
 
+@MainActor
+final class CopiedTexts {
+    var texts: [String] = []
+}
+
 // The KICKR's GATT table used across the bridge tests.
 let ftms = uuid("1826")
 let cyclingPower = uuid("1818")
@@ -187,6 +192,7 @@ final class BridgeHarness {
     let scheduler = FakeScheduler()
     let store = InMemoryStore()
     let unsupported = UnsupportedLog()
+    let copied = CopiedTexts()
     let grants: GrantStore
     let bridge: BluetoothBridge
     let kickr = FakePeripheral(id: kickrID, name: "KICKR CORE 1234")
@@ -198,8 +204,10 @@ final class BridgeHarness {
     init() {
         grants = GrantStore(store: store)
         let unsupported = self.unsupported
+        let copied = self.copied
         bridge = BluetoothBridge(central: central, grants: grants, events: sink, chooser: presenter,
-                                 scheduler: scheduler, onUnsupported: { unsupported.methods.append($0) })
+                                 scheduler: scheduler, onUnsupported: { unsupported.methods.append($0) },
+                                 copyText: { copied.texts.append($0) })
         kickr.gatt = [
             (ftms, [
                 DiscoveredCharacteristic(uuid: controlPoint.characteristic, properties: [.write, .indicate]),

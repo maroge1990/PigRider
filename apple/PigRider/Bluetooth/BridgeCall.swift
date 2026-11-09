@@ -15,16 +15,22 @@ enum BridgeCall: Equatable, Sendable {
     case startNotifications(id: UUID, key: CharacteristicKey)
     case writeValue(id: UUID, key: CharacteristicKey, value: Data, withResponse: Bool)
     case reportUnsupported(method: String)
+    /// Not Bluetooth: the page's `navigator.clipboard.writeText`, which WebKit
+    /// withholds over plain HTTP (the polyfill provides it there).
+    case copyText(text: String)
 
     static let ops = [
         "requestDevice", "getDevices", "forget", "watchAdvertisements", "unwatchAdvertisements", "connect",
         "disconnect", "getPrimaryService", "getCharacteristic", "startNotifications", "writeValue", "reportUnsupported",
+        "copyText",
     ]
 
     static let maxValueBytes = 512
     static let maxFilters = 8
     static let maxServices = 16
     static let maxStringBytes = 248
+    /// A device report with `?debug=controller` (3000 entries) fits.
+    static let maxTextBytes = 1 << 20
 
     /// Convenience for tests and call sites that address a characteristic by its two UUIDs.
     static func getCharacteristic(id: UUID, service: BluetoothUUID, characteristic: BluetoothUUID) -> BridgeCall {
@@ -88,6 +94,8 @@ enum BridgeCall: Equatable, Sendable {
                                value: try args.bytes("value"), withResponse: try args.boolean("withResponse"))
         case "reportUnsupported":
             return .reportUnsupported(method: try args.string("method"))
+        case "copyText":
+            return .copyText(text: try args.text("text"))
         default:
             throw BridgeError(.notSupportedError, "Unknown op.")
         }
@@ -104,6 +112,14 @@ private struct Args {
 
     func string(_ key: String) throws(BridgeError) -> String {
         guard let value = Self.limitedString(dict[key]) else { throw BridgeCall.invalid(key) }
+        return value
+    }
+
+    /// Free text up to `maxTextBytes` (UTF-8).
+    func text(_ key: String) throws(BridgeError) -> String {
+        guard let value = dict[key] as? String, value.utf8.count <= BridgeCall.maxTextBytes else {
+            throw BridgeCall.invalid(key)
+        }
         return value
     }
 

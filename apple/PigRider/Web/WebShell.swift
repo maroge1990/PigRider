@@ -33,7 +33,8 @@ final class WebShell: NSObject {
         self.status = status
         let sink = PageEventSink()
         bridge = BluetoothBridge.live(grants: grants, events: sink, chooser: chooser,
-                                      onUnsupported: { [weak status] in status?.unsupportedMember = $0 })
+                                      onUnsupported: { [weak status] in status?.unsupportedMember = $0 },
+                                      copyText: { UIPasteboard.general.string = $0 })
         handler = BridgeMessageHandler(bridge: bridge, origin: nil)
         let configuration = BridgeWebConfiguration.make(polyfill: polyfill, origin: nil, handler: handler)
         contentController = configuration.userContentController

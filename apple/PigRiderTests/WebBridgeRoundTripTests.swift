@@ -71,6 +71,7 @@ final class RoundTripPage: NSObject, WKNavigationDelegate {
     let central = FakeCentral()
     let kickr = FakePeripheral(id: kickrID, name: "KICKR CORE 1234")
     let presenter = AutoPickPresenter()
+    let copied = CopiedTexts()
     let bridge: BluetoothBridge
     let gate: ReplyGate
     let webView: WKWebView
@@ -79,8 +80,9 @@ final class RoundTripPage: NSObject, WKNavigationDelegate {
     init(polyfill: BridgePolyfill, origin: String = RoundTripPage.origin) {
         self.origin = origin
         let sink = PageEventSink()
+        let copied = self.copied
         bridge = BluetoothBridge(central: central, grants: GrantStore(store: InMemoryStore()), events: sink,
-                                 chooser: presenter, scheduler: FakeScheduler())
+                                 chooser: presenter, scheduler: FakeScheduler(), copyText: { copied.texts.append($0) })
         gate = ReplyGate(bridge)
         let handler = BridgeMessageHandler(bridge: gate, origin: origin)
         webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 400, height: 300),
@@ -248,6 +250,14 @@ struct WebBridgeRoundTripTests {
         #expect(try await page.run("return navigator.bluetooth.pigriderBridge.version") as? Int == 1)
         let devices = try await page.run("return (await navigator.bluetooth.getDevices()).length")
         #expect(devices as? Int == 0)
+    }
+
+    /// WebKit has no `navigator.clipboard` over plain HTTP: the polyfill's goes to the app's clipboard.
+    @Test func aHomeServerOverPlainHTTPCanCopyText() async throws {
+        let page = RoundTripPage(polyfill: try BridgePolyfill.bundled(), origin: "http://192.168.1.20:8080")
+        try await page.load(baseURL: "http://192.168.1.20:8080/")
+        try await page.run("await navigator.clipboard.writeText('OpenRadlr device diagnostics')")
+        #expect(page.copied.texts == ["OpenRadlr device diagnostics"])
     }
 
     @Test func theHTTPTwinOfAnHTTPSServerGetsNoBluetooth() async throws {

@@ -4,7 +4,7 @@ import Foundation
 /// `apple/docs/bridge-protocol.md` on top of CoreBluetooth.
 ///
 /// API for the web view (T7):
-/// - `init(central:grants:events:chooser:scheduler:onUnsupported:)`. The bridge
+/// - `init(central:grants:events:chooser:scheduler:onUnsupported:copyText:)`. The bridge
 ///   makes itself the central's delegate. `BluetoothBridge.live(...)` builds
 ///   one on CoreBluetooth.
 /// - `handle(_:origin:reply:)`: one call, decoded with `BridgeCall.decode`,
@@ -40,6 +40,7 @@ final class BluetoothBridge {
     private let chooserPresenter: any ChooserPresenting
     private let scheduler: any Scheduling
     private let onUnsupported: @MainActor (String) -> Void
+    private let copyText: @MainActor (String) -> Void
     private let scan: ScanCoordinator
 
     private var nextReplyID = 0
@@ -53,13 +54,15 @@ final class BluetoothBridge {
     private var connectedBeforeBackground: [(id: UUID, epoch: Int)] = []
 
     init(central: any CentralManaging, grants: GrantStore, events: any EventSink, chooser: any ChooserPresenting,
-         scheduler: any Scheduling = TaskScheduler(), onUnsupported: @escaping @MainActor (String) -> Void = { _ in }) {
+         scheduler: any Scheduling = TaskScheduler(), onUnsupported: @escaping @MainActor (String) -> Void = { _ in },
+         copyText: @escaping @MainActor (String) -> Void = { _ in }) {
         self.central = central
         self.grants = grants
         self.events = events
         self.chooserPresenter = chooser
         self.scheduler = scheduler
         self.onUnsupported = onUnsupported
+        self.copyText = copyText
         scan = ScanCoordinator(scanner: central)
         central.delegate = self
     }
@@ -112,6 +115,9 @@ final class BluetoothBridge {
             }
         case .reportUnsupported(let method):
             onUnsupported(method)
+            reply.succeed()
+        case .copyText(let text):
+            copyText(text)
             reply.succeed()
         }
     }
