@@ -25,7 +25,9 @@ Strava and intervals.icu.
   natively (the compiler checks), and nothing in the web client or the polyfill
   that iPadOS 17's WebKit (Safari 17) lacks: the compiler cannot check that, and
   the Mac only has iOS 27 simulators.
-- iOS builds and tests run on the Mac with `xcodebuild` (script added in P1).
+- iOS builds and tests run on the Mac with `xcodebuild` (`scripts/mac.sh`). Signed builds
+  (`make -C apple testflight` / `ipad`) need Mark at the terminal for the Mac password:
+  [docs/app-release.md](docs/app-release.md).
 - The server runs on `passyflix` as an Unraid container (`PigRider`, image from GHCR),
   over plain HTTP on the home network only (ADR 0001): [docs/server.md](docs/server.md).
 

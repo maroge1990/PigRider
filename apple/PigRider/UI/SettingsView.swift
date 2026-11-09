@@ -24,7 +24,7 @@ struct SettingsView: View {
                         .foregroundStyle(error == nil ? Color.secondary : Color.red)
                 }
                 Section {
-                    LabeledContent("App version", value: Self.appVersion)
+                    LabeledContent("App version", value: AppVersion.label())
                     LabeledContent("Bluetooth bridge", value: "\(model.bridgeVersion)")
                 }
             }
@@ -47,9 +47,5 @@ struct SettingsView: View {
 
     private func save() {
         error = model.saveServer(address)
-    }
-
-    private static var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
     }
 }

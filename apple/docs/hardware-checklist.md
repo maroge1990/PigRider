@@ -1,6 +1,6 @@
 # Hardware checklist (P1, T8)
 
-Run on the iPad with a development build, mirrored to the Apple TV. Note the
+Run on the iPad with the app from TestFlight (or a development build, `docs/app-release.md`), mirrored to the Apple TV. Note the
 result of each line (✅ / ❌ + what happened) in the PR. On any ❌, use
 *Device diagnostics → Copy report* in the app and paste it into the PR.
 
