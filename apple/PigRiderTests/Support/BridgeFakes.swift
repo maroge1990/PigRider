@@ -162,9 +162,26 @@ final class UnsupportedLog {
     var methods: [String] = []
 }
 
+/// The rider's Copy / Cancel prompt: records what was asked and answers when told
+/// (or at once, with `autoAnswer`). Copies only on Copy, as the app's prompt does.
 @MainActor
-final class CopiedTexts {
-    var texts: [String] = []
+final class CopyPrompts {
+    var asked: [String] = []
+    var copied: [String] = []
+    var autoAnswer: Bool?
+    private var waiting: [(text: String, done: @MainActor (Bool) -> Void)] = []
+
+    func ask(_ text: String, _ done: @escaping @MainActor (Bool) -> Void) {
+        asked.append(text)
+        waiting.append((text, done))
+        if let autoAnswer { answer(autoAnswer) }
+    }
+
+    func answer(_ copy: Bool) {
+        let prompt = waiting.removeFirst()
+        if copy { copied.append(prompt.text) }
+        prompt.done(copy)
+    }
 }
 
 // The KICKR's GATT table used across the bridge tests.
@@ -192,7 +209,7 @@ final class BridgeHarness {
     let scheduler = FakeScheduler()
     let store = InMemoryStore()
     let unsupported = UnsupportedLog()
-    let copied = CopiedTexts()
+    let prompts = CopyPrompts()
     let grants: GrantStore
     let bridge: BluetoothBridge
     let kickr = FakePeripheral(id: kickrID, name: "KICKR CORE 1234")
@@ -204,10 +221,10 @@ final class BridgeHarness {
     init() {
         grants = GrantStore(store: store)
         let unsupported = self.unsupported
-        let copied = self.copied
+        let prompts = self.prompts
         bridge = BluetoothBridge(central: central, grants: grants, events: sink, chooser: presenter,
                                  scheduler: scheduler, onUnsupported: { unsupported.methods.append($0) },
-                                 copyText: { copied.texts.append($0) })
+                                 copyText: { prompts.ask($0, $1) })
         kickr.gatt = [
             (ftms, [
                 DiscoveredCharacteristic(uuid: controlPoint.characteristic, properties: [.write, .indicate]),

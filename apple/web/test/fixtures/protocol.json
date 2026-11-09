@@ -23,7 +23,8 @@
   "InvalidStateError",
   "TimeoutError",
   "AbortError",
-  "DataError"
+  "DataError",
+  "NotAllowedError"
  ],
  "calls": [
   {

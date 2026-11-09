@@ -54,8 +54,9 @@ Option 3.
   a secure context, so the client's service worker, `navigator.wakeLock` and
   `navigator.clipboard` are unavailable; the app keeps the screen awake natively,
   the client copes without a service worker, and the polyfill provides
-  `navigator.clipboard.writeText` through the bridge (`copyText`, on a tap only),
-  since the client's Copy report needs it. HTTPS servers still work.
+  `navigator.clipboard.writeText` through the bridge (`copyText`), since the
+  client's Copy report needs it; the app asks the rider (Copy / Cancel) before
+  every copy, so a page can't overwrite the clipboard on its own. HTTPS servers still work.
 - Strava sign-in happens inside the web view. Strava's own login works there;
   "Sign in with Google" refuses embedded web views (a known risk, see spec).
 - iPadOS suspends web content in the background, so the app keeps the screen

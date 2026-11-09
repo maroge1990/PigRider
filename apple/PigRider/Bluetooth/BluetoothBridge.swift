@@ -40,7 +40,9 @@ final class BluetoothBridge {
     private let chooserPresenter: any ChooserPresenting
     private let scheduler: any Scheduling
     private let onUnsupported: @MainActor (String) -> Void
-    private let copyText: @MainActor (String) -> Void
+    /// Asks the rider (Copy / Cancel), copies on Copy and reports whether it did.
+    private let copyText: @MainActor (String, @escaping @MainActor (Bool) -> Void) -> Void
+    private var copyPromptOpen = false
     private let scan: ScanCoordinator
 
     private var nextReplyID = 0
@@ -55,7 +57,7 @@ final class BluetoothBridge {
 
     init(central: any CentralManaging, grants: GrantStore, events: any EventSink, chooser: any ChooserPresenting,
          scheduler: any Scheduling = TaskScheduler(), onUnsupported: @escaping @MainActor (String) -> Void = { _ in },
-         copyText: @escaping @MainActor (String) -> Void = { _ in }) {
+         copyText: @escaping @MainActor (String, @escaping @MainActor (Bool) -> Void) -> Void = { $1(false) }) {
         self.central = central
         self.grants = grants
         self.events = events
@@ -117,8 +119,13 @@ final class BluetoothBridge {
             onUnsupported(method)
             reply.succeed()
         case .copyText(let text):
-            copyText(text)
-            reply.succeed()
+            // The page can't prove a tap to the app, so the rider confirms each copy, one prompt at a time.
+            guard !copyPromptOpen else { return reply.fail(.copyWaiting) }
+            copyPromptOpen = true
+            copyText(text) { [weak self] copied in
+                self?.copyPromptOpen = false
+                if copied { reply.succeed() } else { reply.fail(.copyCancelled) }
+            }
         }
     }
 

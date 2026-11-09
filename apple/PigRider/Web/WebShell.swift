@@ -12,6 +12,36 @@ final class ShellStatus {
     var loadFailure: String?
 }
 
+/// The rider's Copy / Cancel prompt for the page's `navigator.clipboard.writeText`
+/// over plain HTTP: the page can't prove a tap to the app, so the rider confirms.
+@MainActor
+final class CopyPrompt {
+    var presenter: @MainActor () -> UIViewController? = { nil }
+
+    func ask(_ text: String, done: @escaping @MainActor (Bool) -> Void) {
+        guard let presenter = presenter() else { return done(false) }
+        let alert = UIAlertController(title: "Copy to the clipboard?", message: Self.preview(text), preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in done(false) })
+        alert.addAction(UIAlertAction(title: "Copy", style: .default) { _ in
+            UIPasteboard.general.string = text
+            done(true)
+        })
+        presenter.present(alert, animated: true)
+    }
+
+    /// The first line (up to 80 characters) and how many more follow, so the rider sees what is copied.
+    static func preview(_ text: String) -> String {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        let first = lines.first.map(String.init) ?? ""
+        let shown = first.count > 80 ? String(first.prefix(80)) + "…" : first
+        switch lines.count - 1 {
+        case 0: return "“\(shown)”"
+        case 1: return "“\(shown)” and 1 more line"
+        case let more: return "“\(shown)” and \(more) more lines"
+        }
+    }
+}
+
 /// The full-screen web view with the server's client, the Bluetooth bridge
 /// wired in, and the document lifetime and navigation rules of the spec
 /// ("The web view", "Document lifetime").
@@ -32,9 +62,10 @@ final class WebShell: NSObject {
         let status = ShellStatus()
         self.status = status
         let sink = PageEventSink()
+        let copyPrompt = CopyPrompt()
         bridge = BluetoothBridge.live(grants: grants, events: sink, chooser: chooser,
                                       onUnsupported: { [weak status] in status?.unsupportedMember = $0 },
-                                      copyText: { UIPasteboard.general.string = $0 })
+                                      copyText: { copyPrompt.ask($0, done: $1) })
         handler = BridgeMessageHandler(bridge: bridge, origin: nil)
         let configuration = BridgeWebConfiguration.make(polyfill: polyfill, origin: nil, handler: handler)
         contentController = configuration.userContentController
@@ -48,6 +79,7 @@ final class WebShell: NSObject {
         super.init()
         webView.navigationDelegate = self
         webView.uiDelegate = self
+        copyPrompt.presenter = { [weak self] in self?.presenter }
     }
 
     /// Shows `server` (nil: nothing). A different server ends the current

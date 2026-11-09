@@ -533,7 +533,8 @@ function installPigriderBluetooth(target, { origin, version, channel } = {}) {
 
   Object.defineProperty(target.navigator, "bluetooth", { value: new Bluetooth(), configurable: true, enumerable: true });
   // WebKit offers navigator.clipboard only in a secure context. Over plain HTTP at home
-  // the app copies instead, like a browser: only on a tap (transient user activation).
+  // the app copies instead: only on a tap (transient user activation), like a browser,
+  // and the app then asks the rider (Copy / Cancel), since it can't see the tap.
   if (!target.navigator.clipboard) {
     const clipboard = Object.freeze({
       async writeText(data) {
