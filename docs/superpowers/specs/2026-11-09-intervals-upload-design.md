@@ -1,6 +1,6 @@
 # intervals.icu upload — design
 
-Date: 2026-11-09 · Issue: – · Status: draft
+Date: 2026-11-09 · Issue: – · Status: approved (Gate 1)
 
 ## Goal
 

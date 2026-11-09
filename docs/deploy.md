@@ -212,6 +212,20 @@ a minute). `/api/info` marks the route with `"shared": true` while the link is c
 - `ws://` is unencrypted: rider names and values cross the network in the clear. Use `wss://`
   whenever the OpenBikeNet server is not on your own machine or network.
 
+## intervals.icu (optional, private servers only)
+
+On a server only you ride on, set `OPENRADLR_INTERVALS_API_KEY` to your
+intervals.icu API key (intervals.icu → *Settings* → *Developer Settings*) and
+`OPENRADLR_PUBLIC_URL` to the address you open the app at. *Finish ride* then
+offers *Upload to intervals.icu*, which sends the same FIT file as the Strava
+upload. There is no per-rider sign-in: **every rider's upload lands in this
+one account**, so leave it unset on a server others ride on.
+
+The upload route accepts requests from the server's own page only (the
+`Origin` must match `OPENRADLR_PUBLIC_URL`) and ride file types only, so other
+websites you visit can't post rides into your account. The key stays on the
+server and never appears in logs or replies.
+
 ## Protection against floods and scripts
 
 | Setting | Default | What it limits |

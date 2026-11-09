@@ -184,6 +184,7 @@ All settings live in `.env`; see [`.env.example`](.env.example) for descriptions
 | `OPENRADLR_MESSAGES_PER_SECOND` | `20` | Message rate limit per connection |
 | `OPENRADLR_STRAVA_CLIENT_ID` / `_SECRET` | – | Enable "Connect with Strava" |
 | `OPENRADLR_REQUIRE_STRAVA` | `false` | Riders must connect Strava to join |
+| `OPENRADLR_INTERVALS_API_KEY` | – | Your intervals.icu API key: *Upload to intervals.icu* after a ride, into this one account (private servers only; needs `OPENRADLR_PUBLIC_URL`, see [deploy.md](docs/deploy.md#intervalsicu-optional-private-servers-only)) |
 | `OPENRADLR_ALLOW_SIMULATED_TRAINER` | `true` | Offer the simulated trainer (set `false` in production) |
 | `OPENRADLR_ALLOW_PADDLE_MODE` | `true` | Offer phone paddles (tap left/right for power; no Strava, no ride files) |
 | `OPENRADLR_OBN_URL` | – | `wss://` URL of an OpenBikeNet server: shares the velodrome with riders of other apps (see [deploy.md](docs/deploy.md#openbikenet-optional)) |

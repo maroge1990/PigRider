@@ -23,6 +23,7 @@ import { RidePause } from "./ride/ridePause.js";
 import { AfkPrompt } from "./ride/afkPrompt.js";
 import { defaultServerUrl } from "./net/protocol.js";
 import { StravaClient, activityUrl, stravaMessage } from "./net/strava.js";
+import { IntervalsClient, intervalsActivityUrl, offersIntervalsUpload } from "./net/intervals.js";
 import { levelAfterRace, levelAfterRide, levelLabel, levelOf } from "./profile/level.js";
 import { eventBanner, groupGapLine, eventResultRows, eventRideName, eventRows, renderEventList, sharingLine } from "./view/events.js";
 import { ProfileStore, keepValid, validateProfile } from "./profile/profileStore.js";
@@ -392,6 +393,7 @@ const app = {
   rideMode: readSetting(RIDE_MODE_KEY),
   infoTimer: null,
   strava: new StravaClient(),
+  intervals: new IntervalsClient(),
   wakeLock: new ScreenWakeLock(),
   /** undefined = not checked yet, null = not connected. */
   stravaAccount: undefined,
@@ -2458,6 +2460,7 @@ function initFinish() {
     rideKept();
   });
   $("upload-strava").addEventListener("click", () => uploadToStrava());
+  $("upload-intervals").addEventListener("click", () => uploadToIntervals());
 }
 
 const rideName = () => (app.eventRide ? eventRideName(app.eventRide.kind, app.eventRide.routeName) : `OpenRadlr · ${app.rideRoute.name}`);
@@ -2575,6 +2578,9 @@ function openFinish() {
   const canUpload = measured && Boolean(app.stravaAccount?.can_upload);
   $("upload-strava").hidden = !canUpload;
   $("upload-strava").disabled = empty;
+  $("upload-intervals").hidden = !offersIntervalsUpload(app.info, measured);
+  $("upload-intervals").disabled = empty;
+  $("intervals-status").textContent = "";
   $("upload-status").textContent = empty
     ? t("finish.note.tooShort")
     : !exportable
@@ -2595,6 +2601,31 @@ function openFinish() {
 function uploadToStrava() {
   if (!hasRealPowerSource(app.trainer)) return;
   return uploadRide(app.recorder, rideName(), { indoor: Boolean(app.studio), splits: app.finishSplits, button: $("upload-strava"), status: $("upload-status"), onSaved: rideKept });
+}
+
+/** Sends the finished ride to the server's intervals.icu account as FIT. */
+async function uploadToIntervals() {
+  if (!hasRealPowerSource(app.trainer)) return;
+  const button = $("upload-intervals");
+  const status = $("intervals-status");
+  button.disabled = true;
+  status.textContent = t("intervals.uploading");
+  try {
+    const fit = app.recorder.toFit({ indoor: Boolean(app.studio), splits: app.finishSplits });
+    const { activity_id: id } = await app.intervals.upload(fit, rideName());
+    rideKept();
+    if (id) {
+      status.replaceChildren(
+        t("intervals.done"),
+        Object.assign(document.createElement("a"), { href: intervalsActivityUrl(id), target: "_blank", rel: "noopener", textContent: t("intervals.view") }),
+      );
+    } else {
+      status.textContent = t("intervals.uploaded");
+    }
+  } catch (error) {
+    status.textContent = t("intervals.uploadFailed", { message: error.message });
+    button.disabled = false;
+  }
 }
 
 /**
