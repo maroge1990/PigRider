@@ -46,7 +46,9 @@ The finish screen offers *Upload to Strava* and *Upload to intervals.icu*
 once these are set. Secrets go in the Unraid container settings only, never in
 the repo. After changing them: *Apply*, which restarts the container.
 
-1. **Strava.** Create an API app at <https://www.strava.com/settings/api>
+1. **Strava (off for now).** Strava's API needs the developer account to be a
+   paid Strava subscriber (since June 2026), so these fields stay empty until
+   Mark subscribes ([roadmap](roadmap.md)). Then: create an API app at <https://www.strava.com/settings/api>
    with *Authorization Callback Domain* `192.168.1.235` (the host of *Public
    URL*). Copy its client ID and client secret into *Strava client ID* and
    *Strava client secret*, and set *Secret key* (`openssl rand -hex 32`) so the
