@@ -30,5 +30,8 @@
   <Config Name="Timezone" Target="TZ" Default="Australia/Sydney" Mode="" Description="" Type="Variable" Display="always" Required="false" Mask="false">Australia/Sydney</Config>
   <Config Name="App Data" Target="/app/data" Default="/mnt/user/appdata/pigrider/data" Mode="rw" Description="Strava logins (SQLite). Owned by 99:100. Back it up." Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/pigrider/data</Config>
   <Config Name="Secret key" Target="OPENRADLR_SECRET_KEY" Default="" Mode="" Description="Encrypts Strava logins; needed once Strava is set up. Generate with: openssl rand -hex 32. Keep it the same across updates." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Strava client ID" Target="OPENRADLR_STRAVA_CLIENT_ID" Default="" Mode="" Description="From your Strava API app (strava.com/settings/api). Set together with the client secret, or leave both empty." Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Strava client secret" Target="OPENRADLR_STRAVA_CLIENT_SECRET" Default="" Mode="" Description="From your Strava API app. Entered here only, never in the repo." Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="intervals.icu API key" Target="OPENRADLR_INTERVALS_API_KEY" Default="" Mode="" Description="intervals.icu, Settings, Developer Settings. Every ride uploaded from this server goes to this one account. Entered here only." Type="Variable" Display="always" Required="false" Mask="true"/>
   <Config Name="Log level" Target="RUST_LOG" Default="info" Mode="" Description="" Type="Variable" Display="advanced-hide" Required="false" Mask="false">info</Config>
 </Container>
