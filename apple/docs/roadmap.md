@@ -10,3 +10,12 @@
 
 Out of scope for now: a native tvOS app (no WebKit on tvOS, too few Bluetooth
 slots; see ADR 0001), App Store release (AGPL).
+
+## Backlog
+
+- Ride file downloads (`.tcx`, `.fit`, `.gpx`) in the iPad app: the web view
+  needs a `WKDownloadDelegate` and a share sheet. Uploads to Strava and
+  intervals.icu don't need it. (P1 T7)
+- Links that open a new window (`target=_blank`, `window.open`) go to Safari,
+  so the ride page is never replaced. Revisit if a server page needs a popup.
+- Lint `apple/web/` (ESLint as in `client/`) in `make -C apple check` and CI; today nothing lints it. (P1 Gate 2)

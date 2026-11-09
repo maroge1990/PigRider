@@ -83,6 +83,10 @@ export function fakeTrainer({ name = "Fake Trainer", id = "fake-device-1", servi
     hangConnect: false,
     connectCalls: 0,
     gatt: {
+      /** As in Web Bluetooth: whether the link is up now. */
+      get connected() {
+        return device.connected;
+      },
       async connect() {
         device.connectCalls += 1;
         if (device.hangConnect) return new Promise(() => {});

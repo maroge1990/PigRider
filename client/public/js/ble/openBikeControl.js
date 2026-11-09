@@ -95,9 +95,11 @@ export class OpenBikeControlController extends Emitter {
     buttons.addEventListener("characteristicvaluechanged", this.#onPacket);
     await buttons.startNotifications();
     this.#held.clear();
-    this.connected = true;
     this.#log?.info("Controller: subscribed to OpenBikeControl buttons");
     await this.#sendAppInfo(service);
+    // The link may have dropped during set-up (some steps swallow errors): fail instead of looking connected, so reconnecting goes on.
+    if (!this.#device.gatt.connected) throw new DOMException("Disconnected while connecting", "NetworkError"); // i18n-ok
+    this.connected = true;
   }
 
   /** Optional on both sides: a controller without it still sends every button. */

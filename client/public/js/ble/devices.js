@@ -188,6 +188,8 @@ export class SmartTrainer extends Emitter {
     this.#controlPoint = controlPoint || null;
     if (controlPoint) await this.#takeControl();
     else log?.info("No FTMS control point: resistance will not follow the road");
+    // The link may have dropped during set-up (some steps swallow errors): fail instead of looking connected, so reconnecting goes on.
+    if (!device.gatt.connected) throw new DOMException("Disconnected while connecting", "NetworkError"); // i18n-ok
     this.connected = true;
   }
 
@@ -397,6 +399,8 @@ export class HeartRateMonitor extends Emitter {
     const measurement = await service.getCharacteristic(HEART_RATE_MEASUREMENT);
     measurement.addEventListener("characteristicvaluechanged", this.#onMeasurement);
     await measurement.startNotifications();
+    // The link may have dropped during set-up (some steps swallow errors): fail instead of looking connected, so reconnecting goes on.
+    if (!this.#device.gatt.connected) throw new DOMException("Disconnected while connecting", "NetworkError"); // i18n-ok
     this.connected = true;
   }
 

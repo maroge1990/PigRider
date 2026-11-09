@@ -154,6 +154,8 @@ export class ZwiftController extends Emitter {
     this.#mode = null;
     this.#commands = commands;
     await write(commands, encodeHandshake());
+    // The link may have dropped during set-up (some steps swallow errors): fail instead of looking connected, so reconnecting goes on.
+    if (!this.#device.gatt.connected) throw new DOMException("Disconnected while connecting", "NetworkError"); // i18n-ok
     this.connected = true;
     this.#log?.info("Controller: sent RideOn handshake");
   }

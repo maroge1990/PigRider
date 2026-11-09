@@ -24,7 +24,8 @@ Options considered:
 
 Option 3.
 
-- The web view loads the client **from the self-hosted server** (HTTPS), the same
+- The web view loads the client **from the self-hosted server** (HTTPS, or plain
+  HTTP on the home network; see below), the same
   page a desktop browser gets. A server update ships client updates to the iPad
   without an app release; the app changes only when the bridge does.
 - A user script injected at document start defines `navigator.bluetooth` with
@@ -42,6 +43,20 @@ Option 3.
   a native banner. Because the server pushes client updates at once, a server
   deploy must not need a newer bridge than the installed app (see the spec).
 - The app depends on the server being reachable; no offline riding.
+- **Plain HTTP at home (2026-11-09, Mark's choice).** The server runs on the home
+  network only, so the app also accepts `http://` for home-network hosts: private
+  IPv4/IPv6 addresses, `.local` names and names without a dot (`HomeNetwork`).
+  ATS stays on with the single `NSAllowsLocalNetworking` exception, and iOS asks
+  for Local Network access once. Accepted costs: traffic on the home Wi‑Fi is
+  unencrypted (the Strava session cookie included), and anyone on that network
+  who can answer for the server's name or address gets the page, and with it the
+  bridge (paired devices only; pairing still needs the chooser). The page is not
+  a secure context, so the client's service worker, `navigator.wakeLock` and
+  `navigator.clipboard` are unavailable; the app keeps the screen awake natively,
+  the client copes without a service worker, and the polyfill provides
+  `navigator.clipboard.writeText` through the bridge (`copyText`), since the
+  client's Copy report needs it; the app asks the rider (Copy / Cancel) before
+  every copy, so a page can't overwrite the clipboard on its own. HTTPS servers still work.
 - Strava sign-in happens inside the web view. Strava's own login works there;
   "Sign in with Google" refuses embedded web views (a known risk, see spec).
 - iPadOS suspends web content in the background, so the app keeps the screen
